@@ -1,3 +1,5 @@
 # Build files + the actual chugin
 *.chug
 *.o
+
+.DS_Store
