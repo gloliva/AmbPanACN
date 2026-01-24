@@ -18,6 +18,7 @@ You will most likely need to explicitly set the output audio device and the numb
 ```code
     # Example chuck probe output
     $ chuck --probe
+
     [chuck]: [CoreAudio] driver found 9 audio device(s)...
     [chuck]:
     [chuck]: ------( audio device: 1 )------
