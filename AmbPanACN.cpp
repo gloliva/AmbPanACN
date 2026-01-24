@@ -121,13 +121,17 @@ public:
         return m_elevation;
     }
 
-    t_CKFLOAT set( t_CKFLOAT a, t_CKFLOAT e)
+    t_CKVEC2 set( t_CKFLOAT a, t_CKFLOAT e)
     {
         m_azimuth = a;
         m_elevation = e;
         compute_gains();
 
-        return 1.;  // temporary return
+        // Return a vector with azimuth and elevation
+        t_CKVEC2 retVec;
+        retVec.x = m_azimuth;
+        retVec.y = m_elevation;
+        return retVec;
     }
 
     // getters
@@ -439,7 +443,7 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_mfun( QUERY, ambpanacn_setElevation, "float", "elevation" );
     QUERY->add_arg( QUERY, "float", "e" );
 
-    QUERY->add_mfun( QUERY, ambpanacn_set, "float", "set" );
+    QUERY->add_mfun( QUERY, ambpanacn_set, "vec2", "set" );
     QUERY->add_arg( QUERY, "float", "a" );
     QUERY->add_arg( QUERY, "float", "e" );
 
@@ -550,7 +554,7 @@ CK_DLL_MFUN( ambpanacn_set )
     t_CKFLOAT arg2 = GET_NEXT_FLOAT( ARGS );
 
     // call set() and set the return value
-    RETURN->v_float = apacn_obj->set( arg1, arg2 );
+    RETURN->v_vec2 = apacn_obj->set( arg1, arg2 );
 }
 
 
