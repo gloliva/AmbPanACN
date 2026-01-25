@@ -275,7 +275,7 @@ private:
             m_gain[4] = m_coeffs[4] * sinA * cosE2 * cosA;
             m_gain[5] = m_coeffs[5] * (cosf(2 * m_elevation - m_azimuth) - cosf(2 * m_elevation + m_azimuth));
             m_gain[6] = m_coeffs[6] * sinE2 - 1. / 2.;
-            m_gain[7] = m_coeffs[7] * (sinf(2 * m_elevation - m_azimuth) - sinf(2 * m_elevation + m_azimuth));
+            m_gain[7] = m_coeffs[7] * (sinf(2 * m_elevation - m_azimuth) + sinf(2 * m_elevation + m_azimuth));
             m_gain[8] = m_coeffs[8] * cosE2 * cos2A;
         }
 
@@ -345,7 +345,7 @@ private:
             m_gain[54] = m_coeffs[54] * (143 * sinE4 - 110 * sinE2 + 15) * sinE * sinA * cosE2 * cosA;
             m_gain[55] = m_coeffs[55] * (429 * sinE6 - 495 * sinE4 + 135 * sinE2 - 5) * sinA * cosE;
             m_gain[56] = m_coeffs[56] * (429 * sinE6 - 693 * sinE4 + 315 * sinE2 - 35) * sinE;
-            m_gain[57] = m_coeffs[57] * (429 * sinE4 - 495 * sinE4 + 135 * sinE2 - 5) * cosE * cosA;
+            m_gain[57] = m_coeffs[57] * (429 * sinE6 - 495 * sinE4 + 135 * sinE2 - 5) * cosE * cosA;
             m_gain[58] = m_coeffs[58] * (143 * sinE4 - 110 * sinE2 + 15) * sinE * cosE2 * cos2A;
             m_gain[59] = m_coeffs[59] * (4 * sinA2 - 1) * (143 * sinE4 - 66 * sinE2 + 3) * cosE3 * cosA;
             m_gain[60] = m_coeffs[60] * (13 * sinE2 - 3) * (8 * sinA4 - 8 * sinA2 + 1) * sinE * cosE4;
