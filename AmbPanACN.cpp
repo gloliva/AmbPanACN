@@ -396,7 +396,7 @@ CK_DLL_INFO( AmbPanACN )
     // text description of this chugin; what is it? what does it do? who is it for?
     QUERY->setinfo( QUERY, CHUGIN_INFO_DESCRIPTION, "Ambisonics Panner up to 7th Order" );
     // (optional) URL of the homepage for this chugin
-    QUERY->setinfo( QUERY, CHUGIN_INFO_URL, "" );
+    QUERY->setinfo( QUERY, CHUGIN_INFO_URL, "https://github.com/gloliva/AmbPanACN/tree/master" );
     // (optional) contact email
     QUERY->setinfo( QUERY, CHUGIN_INFO_EMAIL, "" );
 }
@@ -419,9 +419,13 @@ CK_DLL_QUERY( AmbPanACN )
     // to extend a different ChucK class (e.g., "Object")
     QUERY->begin_class( QUERY, "AmbPanACN", "UGen" );
 
+    // set up doc handling
+    QUERY->doc_class( QUERY, "ACN ambisonics panner. Supports up to 7th order." );
+
     // register default constructor
     QUERY->add_ctor( QUERY, ambpanacn_ctor );
     QUERY->add_arg( QUERY, "int", "order" );
+    QUERY->doc_func( QUERY, "Constructor that takes in the ambisonics order" );
     // NOTE constructors can be overloaded like any other functions,
     // each overloaded constructor begins with `QUERY->add_ctor()`
     // followed by a sequence of `QUERY->add_arg()`
@@ -439,19 +443,29 @@ CK_DLL_QUERY( AmbPanACN )
     // setters
     QUERY->add_mfun( QUERY, ambpanacn_setAzimuth, "float", "azimuth" );
     QUERY->add_arg( QUERY, "float", "a" );
+    QUERY->doc_func( QUERY, "Set horizontal angle of point source" );
 
     QUERY->add_mfun( QUERY, ambpanacn_setElevation, "float", "elevation" );
     QUERY->add_arg( QUERY, "float", "e" );
+    QUERY->doc_func( QUERY, "Set vertical angle of point source" );
 
     QUERY->add_mfun( QUERY, ambpanacn_set, "vec2", "set" );
     QUERY->add_arg( QUERY, "float", "a" );
     QUERY->add_arg( QUERY, "float", "e" );
+    QUERY->doc_func( QUERY, "Set both vertical and horizontal angle of point source" );
 
     // getters
     QUERY->add_mfun( QUERY, ambpanacn_getAzimuth, "float", "azimuth" );
+    QUERY->doc_func( QUERY, "Get horizontal angle of point source" );
+
     QUERY->add_mfun( QUERY, ambpanacn_getElevation, "float", "elevation" );
+    QUERY->doc_func( QUERY, "Get vertical angle of point source" );
+
     QUERY->add_mfun( QUERY, ambpanacn_getOrder, "int", "order" );
+    QUERY->doc_func( QUERY, "Get ambisonics order" );
+
     QUERY->add_mfun( QUERY, ambpanacn_getOutChannels, "int", "outChannels" );
+    QUERY->doc_func( QUERY, "Get number of channels needed for the order (e.g. 3rd order returns 16)" );
 
     // this reserves a variable in the ChucK internal class to store
     // referene to the c++ class we defined above

@@ -47,6 +47,10 @@ chout <= IO.nl();
 // instantiate a AmbPanACN
 AmbPanACN amb(order);
 
+chout <= "Printing out amb.help() function" <= IO.nl();
+amb.help();
+chout <= IO.nl();
+
 
 // Set azimuth and elevation
 pi / 2. => amb.azimuth;
@@ -54,20 +58,21 @@ pi / 4. => amb.elevation;
 
 
 // Test and print out parameters
+chout <= "Printing out amb parameters" <= IO.nl();
 assert(amb.order(), order);
-<<< "Order:", amb.order() >>>;
+<<< "    Order:", amb.order() >>>;
 
 assert(amb.outChannels(), Math.pow(order+1, 2));
-<<< "Out channels:", amb.outChannels() >>>;
+<<< "    Out channels:", amb.outChannels() >>>;
 
 assert(amb.channels(), 64);
-<<< "Total channels:", amb.channels() >>>;
+<<< "    Total channels:", amb.channels() >>>;
 
 assert(amb.azimuth(), pi / 2.);
-<<< "Azimuth:", amb.azimuth() >>>;
+<<< "    Azimuth:", amb.azimuth() >>>;
 
 assert(amb.elevation(), pi / 4.);
-<<< "Elevation:", amb.elevation() >>>;
+<<< "    Elevation:", amb.elevation() >>>;
 
 // Test return values for set
 amb.set(pi, pi / 2.) => vec2 ret;
