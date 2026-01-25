@@ -158,6 +158,7 @@ public:
 private:
 
     void compute_coeffs() {
+        // Run only once and store values
         // 1st order - 4 channels
         m_coeffs[0] = 1.;
         m_coeffs[1] = 1.;
@@ -241,25 +242,53 @@ private:
     {
         // Azimuth repeated expressions
         t_CKFLOAT sinA = sinf(m_azimuth);
+        t_CKFLOAT cosA = cosf(m_azimuth);
+
         t_CKFLOAT sinA2 = sinA * sinA;
         t_CKFLOAT sinA4 = sinA2 * sinA2;
+        t_CKFLOAT sinA6 = sinA4 * sinA2;
 
-        t_CKFLOAT cosA = cosf(m_azimuth);
-        t_CKFLOAT cos2A = cosf(2 * m_azimuth);
+        t_CKFLOAT cosA2 = cosA * cosA;
+        t_CKFLOAT cosA4 = cosA2 * cosA2;
+        t_CKFLOAT cosA6 = cosA4 * cosA2;
+
+        t_CKFLOAT sin2A = 2 * sinA * cosA;
+        t_CKFLOAT cos2A = (cosA * cosA) - (sinA * sinA);
+
+        t_CKFLOAT sin3A = 2 * cosA * sin2A - sinA;
+        t_CKFLOAT cos3A = 2 * cosA * cos2A - cosA;
+
+        t_CKFLOAT sin4A = 2 * cosA * sin3A - sin2A;
+        t_CKFLOAT cos4A = 2 * cosA * cos3A - cos2A;
+
+        t_CKFLOAT sin5A = 2 * cosA * sin4A - sin3A;
+        t_CKFLOAT cos5A = 2 * cosA * cos4A - cos3A;
+
+        t_CKFLOAT sin6A = 2 * cosA * sin5A - sin4A;
+        t_CKFLOAT cos6A = 2 * cosA * cos5A - cos4A;
 
         // Elevation repeated expressions
         t_CKFLOAT sinE = sinf(m_elevation);
+        t_CKFLOAT cosE = cosf(m_elevation);
+
         t_CKFLOAT sinE2 = sinE * sinE;
         t_CKFLOAT sinE4 = sinE2 * sinE2;
         t_CKFLOAT sinE6 = sinE4 * sinE2;
 
-        t_CKFLOAT cosE = cosf(m_elevation);
         t_CKFLOAT cosE2 = cosE * cosE;
         t_CKFLOAT cosE3 = cosE2 * cosE;
         t_CKFLOAT cosE4 = cosE2 * cosE2;
+        t_CKFLOAT cosE6 = cosE4 * cosE2;
+        t_CKFLOAT cosE7 = cosE6 * cosE;
 
-        t_CKFLOAT cos2E = cosf(2 * m_elevation);
+        t_CKFLOAT sin2E = 2 * sinE * cosE;
+        t_CKFLOAT cos2E = (cosE * cosE) - (sinE * sinE);
+
+        t_CKFLOAT sin3E = 2 * cosE * sin2E - sinE;
+        t_CKFLOAT cos3E = 2 * cosE * cos2E - cosE;
+
         t_CKFLOAT cos2E_12 = (cos2E + 1) * (cos2E + 1);
+        t_CKFLOAT cos2E_13 = cos2E_12 * (cos2E + 1);
 
         // Calculate ACN Equations with SN3D normalization
         // 1st order - 4 channels
@@ -273,9 +302,9 @@ private:
         // 2nd order - 9 channels
         if (m_order >= 2) {
             m_gain[4] = m_coeffs[4] * sinA * cosE2 * cosA;
-            m_gain[5] = m_coeffs[5] * (cosf(2 * m_elevation - m_azimuth) - cosf(2 * m_elevation + m_azimuth));
-            m_gain[6] = m_coeffs[6] * sinE2 - 1. / 2.;
-            m_gain[7] = m_coeffs[7] * (sinf(2 * m_elevation - m_azimuth) + sinf(2 * m_elevation + m_azimuth));
+            m_gain[5] = m_coeffs[5] * 2 * sin2E * sinA;  // original: (cosf(2 * m_elevation - m_azimuth) - cosf(2 * m_elevation + m_azimuth))
+            m_gain[6] = m_coeffs[6] * sinE2 - 0.5;
+            m_gain[7] = m_coeffs[7] * 2 * sin2E * cosA;  // original: (sinf(2 * m_elevation - m_azimuth) + sinf(2 * m_elevation + m_azimuth))
             m_gain[8] = m_coeffs[8] * cosE2 * cos2A;
         }
 
@@ -292,21 +321,21 @@ private:
 
         // 4th order - 25 channels
         if (m_order >= 4) {
-            m_gain[16] = m_coeffs[16] * cos2E_12 * sinf(4 * m_azimuth);
+            m_gain[16] = m_coeffs[16] * cos2E_12 * sin4A;  // original: sinf(4 * m_azimuth)
             m_gain[17] = m_coeffs[17] * (3 - 4 * sinA2) * sinE * sinA * cosE3;
             m_gain[18] = m_coeffs[18] * (7 * sinE2 - 1) * sinA * cosE2 * cosA;
             m_gain[19] = m_coeffs[19] * (7 * sinE2 - 3) * sinE * sinA * cosE;
-            m_gain[20] = m_coeffs[20] * sinE4 - 15. / 4. * sinE2 + 3. / 8.;
+            m_gain[20] = m_coeffs[20] * sinE4 - 3.75 * sinE2 + 0.375;
             m_gain[21] = m_coeffs[21] * (7 * sinE2 - 3) * sinE * cosE * cosA;
             m_gain[22] = m_coeffs[22] * (7 * sinE2 - 1) * cosE2 * cos2A;
             m_gain[23] = m_coeffs[23] * (1 - 4 * sinA2) * sinE * cosE3 * cosA;
-            m_gain[24] = m_coeffs[24] * (sinA4 - sinA2 + 1. / 8.) * cosE4;
+            m_gain[24] = m_coeffs[24] * (sinA4 - sinA2 + 0.125) * cosE4;
         }
 
         // 5th order - 36 channels
         if (m_order >= 5) {
             m_gain[25] = m_coeffs[25] * (16 * sinA4 - 20 * sinA2 + 5) * sinA * cosE3;
-            m_gain[26] = m_coeffs[26] * cos2E_12 * (cosf(m_elevation - 4 * m_azimuth) - cosf(m_elevation + 4 * m_azimuth));
+            m_gain[26] = m_coeffs[26] * cos2E_12 * 2 * sinE * sin4A;  // original: (cosf(m_elevation - 4 * m_azimuth) - cosf(m_elevation + 4 * m_azimuth))
             m_gain[27] = m_coeffs[27] * (9 * sinE2 - 1) * (4 * sinA2 - 3) * sinA * cosE3;
             m_gain[28] = m_coeffs[28] * (3 * sinE2 - 1) * sinE * sinA * cosE2 * cosA;
             m_gain[29] = m_coeffs[29] * (21 * sinE4 - 14 * sinE2 + 1) * sinA * cosE;
@@ -315,32 +344,32 @@ private:
             m_gain[32] = m_coeffs[32] * (3 * sinE2 - 1) * sinE * cosE2 * cos2A;
             m_gain[33] = m_coeffs[33] * (9 * sinE2 - 1) * (4 * sinA2 - 1) * cosE3 * cosA;
             m_gain[34] = m_coeffs[34] * (8 * sinA4 - 8 * sinA2 + 1) * sinE * cosE4;
-            m_gain[35] = m_coeffs[35] * cos2E_12 * (cosf(m_elevation - 5 * m_azimuth) + cosf(m_elevation + 5 * m_azimuth));
+            m_gain[35] = m_coeffs[35] * cos2E_12 * 2 * cosE * cos5A;  // original: (cosf(m_elevation - 5 * m_azimuth) + cosf(m_elevation + 5 * m_azimuth))
         }
 
         // 6th order - 49 channels
         if (m_order >= 6) {
-            m_gain[36] = m_coeffs[36] * (16 * sinA4 - 16 * sinA2 + 3) * sinA * pow6(cosE) * cosA;
+            m_gain[36] = m_coeffs[36] * (16 * sinA4 - 16 * sinA2 + 3) * sinA * cosE6 * cosA;  // original: (16 * sinA4 - 16 * sinA2 + 3) * sinA * pow6(cosE) * cosA
             m_gain[37] = m_coeffs[37] * (16 * sinA4 - 20 * sinA2 + 5) * sinE * sinA * cosE3;
-            m_gain[38] = m_coeffs[38] * cos2E_12 * (18 * sinf(4 * m_azimuth) + 11 * sinf(2 * m_elevation - 4 * m_azimuth) - 11 * sinf(2 * m_elevation + 4 * m_azimuth));
+            m_gain[38] = m_coeffs[38] * cos2E_12 * sin4A * (18 - 22 * cos2E);  // original: (18 * sinf(4 * m_azimuth) + 11 * sinf(2 * m_elevation - 4 * m_azimuth) - 11 * sinf(2 * m_elevation + 4 * m_azimuth))
             m_gain[39] = m_coeffs[39] * (11 * sinE2 - 3) * (4 * sinA2 - 3) * sinE * sinA * cosE3;
             m_gain[40] = m_coeffs[40] * (33 * sinE4 - 18 * sinE2 + 1) * sinA * cosE2 * cosA;
             m_gain[41] = m_coeffs[41] * (33 * sinE4 - 30 * sinE2 + 5) * sinE * sinA * cosE;
-            m_gain[42] = m_coeffs[42] * sinE6 - 315. / 16. * sinE4 + (105. / 16.) * sinE2 - 5. / 16.;
-            m_gain[43] = m_coeffs[43] * sqrt(21) * (33 * sinE4 - 30 * sinE2 + 5) * sinE * cosE * cosA;
+            m_gain[42] = m_coeffs[42] * sinE6 - 19.6875 * sinE4 + 6.5625 * sinE2 - 0.3125;
+            m_gain[43] = m_coeffs[43] * 4.58257569496 * (33 * sinE4 - 30 * sinE2 + 5) * sinE * cosE * cosA;  // original: sqrt(21) * (33 * sinE4 - 30 * sinE2 + 5) * sinE * cosE * cosA
             m_gain[44] = m_coeffs[44] * (33 * sinE4 - 18 * sinE2 + 1) * cosE2 * cos2A;
             m_gain[45] = m_coeffs[45] * (11 * sinE2 - 3) * (4 * sinA2 - 1) * sinE * cosE3 * cosA;
             m_gain[46] = m_coeffs[46] * (11 * sinE2 - 1) * (8 * sinA4 - 8 * sinA2 + 1) * cosE4;
-            m_gain[47] = m_coeffs[47] * (sinf(2 * m_elevation - 5 * m_azimuth) + sinf(2 * m_elevation + 5 * m_azimuth)) * cos2E_12;
-            m_gain[48] = m_coeffs[48] * pow3(cos2E + 1) * cosf(6 * m_azimuth);
+            m_gain[47] = m_coeffs[47] * 2 * sin2E * cos5A * cos2E_12;  // original: (sinf(2 * m_elevation - 5 * m_azimuth) + sinf(2 * m_elevation + 5 * m_azimuth)) * cos2E_12
+            m_gain[48] = m_coeffs[48] * cos2E_13 * cos6A;  // original: pow3(cos2E + 1) * cosf(6 * m_azimuth)
         }
 
         // 7th order - 64 channels
         if (m_order >= 7) {
-            m_gain[49] = m_coeffs[49] * (-57 * pow6(sinA) + 91 * sinA4 - 35 * sinA2 + 7 * pow6(cosA)) * sinA * pow7(cosE);
-            m_gain[50] = m_coeffs[50] * pow3(cos2E + 1) * (cosf(m_elevation - 6 * m_azimuth) - cosf(m_elevation + 6 * m_azimuth));
+            m_gain[49] = m_coeffs[49] * (-57 * sinA6 + 91 * sinA4 - 35 * sinA2 + 7 * cosA6) * sinA * cosE7;  // original: (-57 * pow6(sinA) + 91 * sinA4 - 35 * sinA2 + 7 * pow6(cosA)) * sinA * pow7(cosE)
+            m_gain[50] = m_coeffs[50] * cos2E_13 * (2 * sinE * sin6A);  // original: pow3(cos2E + 1) * (cosf(m_elevation - 6 * m_azimuth) - cosf(m_elevation + 6 * m_azimuth))
             m_gain[51] = m_coeffs[51] * (13 * sinE2 - 1) * (16 * sinA4 - 20 * sinA2 + 5) * sinA * cosE3;
-            m_gain[52] = m_coeffs[52] * cos2E_12 * (27 * cosf(m_elevation - 4 * m_azimuth) - 27 * cosf(m_elevation + 4 * m_azimuth) - 13 * cosf(3 * m_elevation - 4 * m_azimuth) + 13 * cosf(3 * m_elevation + 4 * m_azimuth));
+            m_gain[52] = m_coeffs[52] * cos2E_12 * sin4A * (54 * sinE - 26 * sin3E);  // original: cos2E_12 * (27 * cosf(m_elevation - 4 * m_azimuth) - 27 * cosf(m_elevation + 4 * m_azimuth) - 13 * cosf(3 * m_elevation - 4 * m_azimuth) + 13 * cosf(3 * m_elevation + 4 * m_azimuth))
             m_gain[53] = m_coeffs[53] * (4 * sinA2 - 3) * (143 * sinE4 - 66 * sinE2 + 3) * sinA * cosE3;
             m_gain[54] = m_coeffs[54] * (143 * sinE4 - 110 * sinE2 + 15) * sinE * sinA * cosE2 * cosA;
             m_gain[55] = m_coeffs[55] * (429 * sinE6 - 495 * sinE4 + 135 * sinE2 - 5) * sinA * cosE;
@@ -350,24 +379,9 @@ private:
             m_gain[59] = m_coeffs[59] * (4 * sinA2 - 1) * (143 * sinE4 - 66 * sinE2 + 3) * cosE3 * cosA;
             m_gain[60] = m_coeffs[60] * (13 * sinE2 - 3) * (8 * sinA4 - 8 * sinA2 + 1) * sinE * cosE4;
             m_gain[61] = m_coeffs[61] * (13 * sinE2 - 1) * (16 * sinA4 - 12 * sinA2 + 1) * cosE3 * cosA;
-            m_gain[62] = m_coeffs[62] * (sinf(m_elevation - 6 * m_azimuth) + sinf(m_elevation + 6 * m_azimuth)) * pow3(cos2E + 1);
-            m_gain[63] = m_coeffs[63] * (-63 * pow6(sinA) + 77 * sinA4 - 21 * sinA2 + pow6(cosA)) * pow7(cosE) * cosA;
+            m_gain[62] = m_coeffs[62] * (2 * sinE * cos6A) * cos2E_13;  // original: (sinf(m_elevation - 6 * m_azimuth) + sinf(m_elevation + 6 * m_azimuth)) * pow3(cos2E + 1)
+            m_gain[63] = m_coeffs[63] * (-63 * sinA6 + 77 * sinA4 - 21 * sinA2 + cosA6) * cosE7 * cosA;  // original: (-63 * pow6(sinA) + 77 * sinA4 - 21 * sinA2 + pow6(cosA)) * pow7(cosE) * cosA
         }
-    }
-
-    inline t_CKFLOAT pow3(t_CKFLOAT x) {
-        t_CKFLOAT x2 = x * x;
-        return x2 * x;
-    }
-
-    inline t_CKFLOAT pow6(t_CKFLOAT x) {
-        t_CKFLOAT x2 = x * x;
-        return x2 * x2 * x2;
-    }
-
-    inline t_CKFLOAT pow7(t_CKFLOAT x) {
-        t_CKFLOAT x3 = x * x * x;
-        return x3 * x3 * x;
     }
 
     // instance data

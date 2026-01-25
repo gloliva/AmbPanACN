@@ -45,7 +45,6 @@ if (order < 1 || order > 7) {
 
 // instantiate a AmbPanACN
 CNoise noise => AmbPanACN amb(order) => dac;
-0.5 => noise.gain;
 "pink" => noise.mode;
 
 chout <= "Dac channels: " <= dac.channels() <= IO.nl();
