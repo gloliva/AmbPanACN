@@ -91,4 +91,4 @@ For automating these values, one approach is to use the `Patch` and `Range` clas
     SinOsc lfo(0.1) => Range r(pi / 2., -pi / 2.) => Patch p(amb2, "azimuth") => blackhole;
 ```
 
-A larger example with three voices can be viewed in `tests/AmbPanACN-testMany.ck`.
+A larger example with three voices can be viewed in `examples/AmbPanACN-example3Voices.ck`.
