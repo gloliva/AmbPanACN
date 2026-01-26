@@ -87,11 +87,6 @@ public:
         m_elevation = 0;
         compute_coeffs();
         compute_gains();
-
-        // Set channel map
-        for(int i = 0; i < MAX_CHANNELS; i++) {
-            m_channel_map[i] = i;
-        }
     }
 
     // for chugins extending UGen
@@ -99,9 +94,16 @@ public:
     {
         for(int f = 0; f < nframes; f++)
         {
-            for(int c = 0; c < MAX_CHANNELS; c++)
+            // Write only active channels
+            for(int c = 0; c < m_out_channels; c++)
             {
-                out[f*MAX_CHANNELS+m_channel_map[c]] = m_gain[c] * in[f*MAX_CHANNELS];
+                out[f * MAX_CHANNELS + c] = m_gain[c] * in[f];
+            }
+
+            // Zero out the rest
+            for(int c = m_out_channels; c < MAX_CHANNELS; c++)
+            {
+                out[f * MAX_CHANNELS + c] = 0.;
             }
         }
     }
@@ -392,7 +394,6 @@ private:
     t_CKFLOAT m_elevation;
     t_CKFLOAT m_coeffs[MAX_CHANNELS];
     t_CKFLOAT m_gain[MAX_CHANNELS];
-    t_CKUINT m_channel_map[MAX_CHANNELS];
 };
 
 
@@ -449,7 +450,7 @@ CK_DLL_QUERY( AmbPanACN )
 
     // for UGens only: add tick function
     // NOTE a non-UGen class should remove or comment out this next line
-    QUERY->add_ugen_funcf( QUERY, ambpanacn_tickf, NULL, MAX_CHANNELS, MAX_CHANNELS );
+    QUERY->add_ugen_funcf( QUERY, ambpanacn_tickf, NULL, 1, MAX_CHANNELS );
     // NOTE: if this is to be a UGen with more than 1 channel,
     // e.g., a multichannel UGen -- will need to use add_ugen_funcf()
     // and declare a tickf function using CK_DLL_TICKF
