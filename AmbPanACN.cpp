@@ -50,6 +50,8 @@ const int MAX_CHANNELS = 64;
 
 // declaration of chugin constructor
 CK_DLL_CTOR( ambpanacn_ctor );
+CK_DLL_CTOR( ambpanacn_ctor_order );
+CK_DLL_CTOR( ambpanacn_ctor_orderAndPeriod );
 // declaration of chugin desctructor
 CK_DLL_DTOR( ambpanacn_dtor );
 
@@ -57,12 +59,14 @@ CK_DLL_DTOR( ambpanacn_dtor );
 CK_DLL_MFUN( ambpanacn_setAzimuth );
 CK_DLL_MFUN( ambpanacn_setElevation );
 CK_DLL_MFUN( ambpanacn_set );
+CK_DLL_MFUN( ambpanacn_setUpdatePeriod );
 
 // declaration of getters
 CK_DLL_MFUN( ambpanacn_getAzimuth );
 CK_DLL_MFUN( ambpanacn_getElevation );
 CK_DLL_MFUN( ambpanacn_getOrder );
 CK_DLL_MFUN( ambpanacn_getOutChannels );
+CK_DLL_MFUN( ambpanacn_getUpdatePeriod );
 
 // for chugins extending UGen, this is mono synthesis function for 1 sample
 CK_DLL_TICKF( ambpanacn_tickf );
@@ -79,47 +83,92 @@ class AmbPanACN
 {
 public:
     // constructor
-    AmbPanACN( t_CKFLOAT fs, t_CKINT order )
+    AmbPanACN( t_CKFLOAT fs, t_CKINT order, t_CKINT update_period )
     {
         m_order = order;
         m_out_channels = (order+1) * (order+1);
         m_azimuth = 0;
         m_elevation = 0;
+
+        // Gain interpolation
+        m_update_period = update_period;
+        m_samples_left = 0;
+
+        for (int c = 0; c < MAX_CHANNELS; c++)
+        {
+            m_gain_cur[c] = 0;
+            m_gain_step[c] = 0;
+        }
+
+        // Initial calculation for coefficients + gains
         compute_coeffs();
         compute_gains();
+
+        // Initialize starting gains
+        for (int c = 0; c < MAX_CHANNELS; c++)
+        {
+            m_gain_cur[c] = m_gain_next[c];
+        }
     }
 
     // for chugins extending UGen
     void tick( SAMPLE * in, SAMPLE * out, int nframes )
     {
-        for(int f = 0; f < nframes; f++)
+        // compute new gains only if updatePeriod samples have passed and azimuth and/or elevation has changed
+        if (m_samples_left <= 0 && m_dirty == true)
         {
-            // Write only active channels
-            for(int c = 0; c < m_out_channels; c++)
+            // Update gains based on new azimuth / elevation
+            compute_gains();
+
+            // Set gain step size
+            for (int c = 0; c < m_out_channels; c++)
             {
-                out[f * MAX_CHANNELS + c] = m_gain[c] * in[f];
+                m_gain_step[c] = (m_gain_next[c] - m_gain_cur[c]) / m_update_period;
             }
 
-            // Zero out the rest
-            for(int c = m_out_channels; c < MAX_CHANNELS; c++)
-            {
-                out[f * MAX_CHANNELS + c] = 0.;
-            }
+            m_samples_left = m_update_period;
+            m_dirty = false;
         }
+
+        // Write only active channels
+        for(int c = 0; c < m_out_channels; c++)
+        {
+            out[c] = m_gain_cur[c] * in[0];
+        }
+
+        // Zero out the rest
+        for(int c = m_out_channels; c < MAX_CHANNELS; c++)
+        {
+            out[c] = 0.;
+        }
+
+        // Advance gains toward target
+        for (int c = 0; c < m_out_channels; c++) {
+            m_gain_cur[c] += m_gain_step[c];
+        }
+
+        // Decrement sample counter
+        m_samples_left--;
     }
 
     // setters
     t_CKFLOAT setAzimuth( t_CKFLOAT a )
     {
-        m_azimuth = a;
-        compute_gains();
+        if (a != m_azimuth)
+        {
+            m_azimuth = a;
+            m_dirty = true;
+        }
         return m_azimuth;
     }
 
     t_CKFLOAT setElevation( t_CKFLOAT e )
     {
-        m_elevation = e;
-        compute_gains();
+        if (e != m_elevation)
+        {
+            m_elevation = e;
+            m_dirty = true;
+        }
         return m_elevation;
     }
 
@@ -127,13 +176,20 @@ public:
     {
         m_azimuth = a;
         m_elevation = e;
-        compute_gains();
+        m_dirty = true;
 
         // Return a vector with azimuth and elevation
         t_CKVEC2 retVec;
         retVec.x = m_azimuth;
         retVec.y = m_elevation;
         return retVec;
+    }
+
+    t_CKINT setUpdatePeriod( t_CKINT p )
+    {
+        m_update_period = p;
+        m_samples_left = 0;
+        return m_update_period;
     }
 
     // getters
@@ -155,6 +211,11 @@ public:
     t_CKINT getOutChannels()
     {
         return m_out_channels;
+    }
+
+    t_CKINT getUpdatePeriod()
+    {
+        return m_update_period;
     }
 
 private:
@@ -295,105 +356,111 @@ private:
         // Calculate ACN Equations with SN3D normalization
         // 1st order - 4 channels
         if (m_order >= 1) {
-            m_gain[0] = 1.;
-            m_gain[1] = sinA * cosE;
-            m_gain[2] = sinE;
-            m_gain[3] = cosE * cosA;
+            m_gain_next[0] = 1.;
+            m_gain_next[1] = sinA * cosE;
+            m_gain_next[2] = sinE;
+            m_gain_next[3] = cosE * cosA;
         }
 
         // 2nd order - 9 channels
         if (m_order >= 2) {
-            m_gain[4] = m_coeffs[4] * sinA * cosE2 * cosA;
-            m_gain[5] = m_coeffs[5] * 2 * sin2E * sinA;
-            m_gain[6] = m_coeffs[6] * sinE2 - 0.5;
-            m_gain[7] = m_coeffs[7] * 2 * sin2E * cosA;
-            m_gain[8] = m_coeffs[8] * cosE2 * cos2A;
+            m_gain_next[4] = m_coeffs[4] * sinA * cosE2 * cosA;
+            m_gain_next[5] = m_coeffs[5] * 2 * sin2E * sinA;
+            m_gain_next[6] = m_coeffs[6] * sinE2 - 0.5;
+            m_gain_next[7] = m_coeffs[7] * 2 * sin2E * cosA;
+            m_gain_next[8] = m_coeffs[8] * cosE2 * cos2A;
         }
 
         // 3rd order - 16 channels
         if (m_order >= 3) {
-            m_gain[9]  = m_coeffs[9]  * (3 - 4 * sinA2) * sinA * cosE3;
-            m_gain[10] = m_coeffs[10] * sinE * sinA * cosE2 * cosA;
-            m_gain[11] = m_coeffs[11] * (5 * sinE2 - 1) * sinA * cosE;
-            m_gain[12] = m_coeffs[12] * (5 * sinE2 - 3) * sinE;
-            m_gain[13] = m_coeffs[13] * (5 * sinE2 - 1) * cosE * cosA;
-            m_gain[14] = m_coeffs[14] * sinE * cosE2 * cos2A;
-            m_gain[15] = m_coeffs[15] * (1 - 4 * sinA2) * cosE3 * cosA;
+            m_gain_next[9]  = m_coeffs[9]  * (3 - 4 * sinA2) * sinA * cosE3;
+            m_gain_next[10] = m_coeffs[10] * sinE * sinA * cosE2 * cosA;
+            m_gain_next[11] = m_coeffs[11] * (5 * sinE2 - 1) * sinA * cosE;
+            m_gain_next[12] = m_coeffs[12] * (5 * sinE2 - 3) * sinE;
+            m_gain_next[13] = m_coeffs[13] * (5 * sinE2 - 1) * cosE * cosA;
+            m_gain_next[14] = m_coeffs[14] * sinE * cosE2 * cos2A;
+            m_gain_next[15] = m_coeffs[15] * (1 - 4 * sinA2) * cosE3 * cosA;
         }
 
         // 4th order - 25 channels
         if (m_order >= 4) {
-            m_gain[16] = m_coeffs[16] * cos2E_12 * sin4A;
-            m_gain[17] = m_coeffs[17] * (3 - 4 * sinA2) * sinE * sinA * cosE3;
-            m_gain[18] = m_coeffs[18] * (7 * sinE2 - 1) * sinA * cosE2 * cosA;
-            m_gain[19] = m_coeffs[19] * (7 * sinE2 - 3) * sinE * sinA * cosE;
-            m_gain[20] = m_coeffs[20] * sinE4 - 3.75 * sinE2 + 0.375;
-            m_gain[21] = m_coeffs[21] * (7 * sinE2 - 3) * sinE * cosE * cosA;
-            m_gain[22] = m_coeffs[22] * (7 * sinE2 - 1) * cosE2 * cos2A;
-            m_gain[23] = m_coeffs[23] * (1 - 4 * sinA2) * sinE * cosE3 * cosA;
-            m_gain[24] = m_coeffs[24] * (sinA4 - sinA2 + 0.125) * cosE4;
+            m_gain_next[16] = m_coeffs[16] * cos2E_12 * sin4A;
+            m_gain_next[17] = m_coeffs[17] * (3 - 4 * sinA2) * sinE * sinA * cosE3;
+            m_gain_next[18] = m_coeffs[18] * (7 * sinE2 - 1) * sinA * cosE2 * cosA;
+            m_gain_next[19] = m_coeffs[19] * (7 * sinE2 - 3) * sinE * sinA * cosE;
+            m_gain_next[20] = m_coeffs[20] * sinE4 - 3.75 * sinE2 + 0.375;
+            m_gain_next[21] = m_coeffs[21] * (7 * sinE2 - 3) * sinE * cosE * cosA;
+            m_gain_next[22] = m_coeffs[22] * (7 * sinE2 - 1) * cosE2 * cos2A;
+            m_gain_next[23] = m_coeffs[23] * (1 - 4 * sinA2) * sinE * cosE3 * cosA;
+            m_gain_next[24] = m_coeffs[24] * (sinA4 - sinA2 + 0.125) * cosE4;
         }
 
         // 5th order - 36 channels
         if (m_order >= 5) {
-            m_gain[25] = m_coeffs[25] * (16 * sinA4 - 20 * sinA2 + 5) * sinA * cosE3;
-            m_gain[26] = m_coeffs[26] * cos2E_12 * 2 * sinE * sin4A;
-            m_gain[27] = m_coeffs[27] * (9 * sinE2 - 1) * (4 * sinA2 - 3) * sinA * cosE3;
-            m_gain[28] = m_coeffs[28] * (3 * sinE2 - 1) * sinE * sinA * cosE2 * cosA;
-            m_gain[29] = m_coeffs[29] * (21 * sinE4 - 14 * sinE2 + 1) * sinA * cosE;
-            m_gain[30] = m_coeffs[30] * (63 * sinE4 - 70 * sinE2 + 15) * sinE;
-            m_gain[31] = m_coeffs[31] * (21 * sinE4 - 14 * sinE2 + 1) * cosE * cosA;
-            m_gain[32] = m_coeffs[32] * (3 * sinE2 - 1) * sinE * cosE2 * cos2A;
-            m_gain[33] = m_coeffs[33] * (9 * sinE2 - 1) * (4 * sinA2 - 1) * cosE3 * cosA;
-            m_gain[34] = m_coeffs[34] * (8 * sinA4 - 8 * sinA2 + 1) * sinE * cosE4;
-            m_gain[35] = m_coeffs[35] * cos2E_12 * 2 * cosE * cos5A;
+            m_gain_next[25] = m_coeffs[25] * (16 * sinA4 - 20 * sinA2 + 5) * sinA * cosE3;
+            m_gain_next[26] = m_coeffs[26] * cos2E_12 * 2 * sinE * sin4A;
+            m_gain_next[27] = m_coeffs[27] * (9 * sinE2 - 1) * (4 * sinA2 - 3) * sinA * cosE3;
+            m_gain_next[28] = m_coeffs[28] * (3 * sinE2 - 1) * sinE * sinA * cosE2 * cosA;
+            m_gain_next[29] = m_coeffs[29] * (21 * sinE4 - 14 * sinE2 + 1) * sinA * cosE;
+            m_gain_next[30] = m_coeffs[30] * (63 * sinE4 - 70 * sinE2 + 15) * sinE;
+            m_gain_next[31] = m_coeffs[31] * (21 * sinE4 - 14 * sinE2 + 1) * cosE * cosA;
+            m_gain_next[32] = m_coeffs[32] * (3 * sinE2 - 1) * sinE * cosE2 * cos2A;
+            m_gain_next[33] = m_coeffs[33] * (9 * sinE2 - 1) * (4 * sinA2 - 1) * cosE3 * cosA;
+            m_gain_next[34] = m_coeffs[34] * (8 * sinA4 - 8 * sinA2 + 1) * sinE * cosE4;
+            m_gain_next[35] = m_coeffs[35] * cos2E_12 * 2 * cosE * cos5A;
         }
 
         // 6th order - 49 channels
         if (m_order >= 6) {
-            m_gain[36] = m_coeffs[36] * (16 * sinA4 - 16 * sinA2 + 3) * sinA * cosE6 * cosA;
-            m_gain[37] = m_coeffs[37] * (16 * sinA4 - 20 * sinA2 + 5) * sinE * sinA * cosE3;
-            m_gain[38] = m_coeffs[38] * cos2E_12 * sin4A * (18 - 22 * cos2E);
-            m_gain[39] = m_coeffs[39] * (11 * sinE2 - 3) * (4 * sinA2 - 3) * sinE * sinA * cosE3;
-            m_gain[40] = m_coeffs[40] * (33 * sinE4 - 18 * sinE2 + 1) * sinA * cosE2 * cosA;
-            m_gain[41] = m_coeffs[41] * (33 * sinE4 - 30 * sinE2 + 5) * sinE * sinA * cosE;
-            m_gain[42] = m_coeffs[42] * sinE6 - 19.6875 * sinE4 + 6.5625 * sinE2 - 0.3125;
-            m_gain[43] = m_coeffs[43] * 4.58257569496 * (33 * sinE4 - 30 * sinE2 + 5) * sinE * cosE * cosA;
-            m_gain[44] = m_coeffs[44] * (33 * sinE4 - 18 * sinE2 + 1) * cosE2 * cos2A;
-            m_gain[45] = m_coeffs[45] * (11 * sinE2 - 3) * (4 * sinA2 - 1) * sinE * cosE3 * cosA;
-            m_gain[46] = m_coeffs[46] * (11 * sinE2 - 1) * (8 * sinA4 - 8 * sinA2 + 1) * cosE4;
-            m_gain[47] = m_coeffs[47] * 2 * sin2E * cos5A * cos2E_12;
-            m_gain[48] = m_coeffs[48] * cos2E_13 * cos6A;
+            m_gain_next[36] = m_coeffs[36] * (16 * sinA4 - 16 * sinA2 + 3) * sinA * cosE6 * cosA;
+            m_gain_next[37] = m_coeffs[37] * (16 * sinA4 - 20 * sinA2 + 5) * sinE * sinA * cosE3;
+            m_gain_next[38] = m_coeffs[38] * cos2E_12 * sin4A * (18 - 22 * cos2E);
+            m_gain_next[39] = m_coeffs[39] * (11 * sinE2 - 3) * (4 * sinA2 - 3) * sinE * sinA * cosE3;
+            m_gain_next[40] = m_coeffs[40] * (33 * sinE4 - 18 * sinE2 + 1) * sinA * cosE2 * cosA;
+            m_gain_next[41] = m_coeffs[41] * (33 * sinE4 - 30 * sinE2 + 5) * sinE * sinA * cosE;
+            m_gain_next[42] = m_coeffs[42] * sinE6 - 19.6875 * sinE4 + 6.5625 * sinE2 - 0.3125;
+            m_gain_next[43] = m_coeffs[43] * 4.58257569496 * (33 * sinE4 - 30 * sinE2 + 5) * sinE * cosE * cosA;
+            m_gain_next[44] = m_coeffs[44] * (33 * sinE4 - 18 * sinE2 + 1) * cosE2 * cos2A;
+            m_gain_next[45] = m_coeffs[45] * (11 * sinE2 - 3) * (4 * sinA2 - 1) * sinE * cosE3 * cosA;
+            m_gain_next[46] = m_coeffs[46] * (11 * sinE2 - 1) * (8 * sinA4 - 8 * sinA2 + 1) * cosE4;
+            m_gain_next[47] = m_coeffs[47] * 2 * sin2E * cos5A * cos2E_12;
+            m_gain_next[48] = m_coeffs[48] * cos2E_13 * cos6A;
         }
 
         // 7th order - 64 channels
         if (m_order >= 7) {
-            m_gain[49] = m_coeffs[49] * (-57 * sinA6 + 91 * sinA4 - 35 * sinA2 + 7 * cosA6) * sinA * cosE7;
-            m_gain[50] = m_coeffs[50] * cos2E_13 * (2 * sinE * sin6A);
-            m_gain[51] = m_coeffs[51] * (13 * sinE2 - 1) * (16 * sinA4 - 20 * sinA2 + 5) * sinA * cosE3;
-            m_gain[52] = m_coeffs[52] * cos2E_12 * sin4A * (54 * sinE - 26 * sin3E);
-            m_gain[53] = m_coeffs[53] * (4 * sinA2 - 3) * (143 * sinE4 - 66 * sinE2 + 3) * sinA * cosE3;
-            m_gain[54] = m_coeffs[54] * (143 * sinE4 - 110 * sinE2 + 15) * sinE * sinA * cosE2 * cosA;
-            m_gain[55] = m_coeffs[55] * (429 * sinE6 - 495 * sinE4 + 135 * sinE2 - 5) * sinA * cosE;
-            m_gain[56] = m_coeffs[56] * (429 * sinE6 - 693 * sinE4 + 315 * sinE2 - 35) * sinE;
-            m_gain[57] = m_coeffs[57] * (429 * sinE6 - 495 * sinE4 + 135 * sinE2 - 5) * cosE * cosA;
-            m_gain[58] = m_coeffs[58] * (143 * sinE4 - 110 * sinE2 + 15) * sinE * cosE2 * cos2A;
-            m_gain[59] = m_coeffs[59] * (4 * sinA2 - 1) * (143 * sinE4 - 66 * sinE2 + 3) * cosE3 * cosA;
-            m_gain[60] = m_coeffs[60] * (13 * sinE2 - 3) * (8 * sinA4 - 8 * sinA2 + 1) * sinE * cosE4;
-            m_gain[61] = m_coeffs[61] * (13 * sinE2 - 1) * (16 * sinA4 - 12 * sinA2 + 1) * cosE3 * cosA;
-            m_gain[62] = m_coeffs[62] * (2 * sinE * cos6A) * cos2E_13;
-            m_gain[63] = m_coeffs[63] * (-63 * sinA6 + 77 * sinA4 - 21 * sinA2 + cosA6) * cosE7 * cosA;
+            m_gain_next[49] = m_coeffs[49] * (-57 * sinA6 + 91 * sinA4 - 35 * sinA2 + 7 * cosA6) * sinA * cosE7;
+            m_gain_next[50] = m_coeffs[50] * cos2E_13 * (2 * sinE * sin6A);
+            m_gain_next[51] = m_coeffs[51] * (13 * sinE2 - 1) * (16 * sinA4 - 20 * sinA2 + 5) * sinA * cosE3;
+            m_gain_next[52] = m_coeffs[52] * cos2E_12 * sin4A * (54 * sinE - 26 * sin3E);
+            m_gain_next[53] = m_coeffs[53] * (4 * sinA2 - 3) * (143 * sinE4 - 66 * sinE2 + 3) * sinA * cosE3;
+            m_gain_next[54] = m_coeffs[54] * (143 * sinE4 - 110 * sinE2 + 15) * sinE * sinA * cosE2 * cosA;
+            m_gain_next[55] = m_coeffs[55] * (429 * sinE6 - 495 * sinE4 + 135 * sinE2 - 5) * sinA * cosE;
+            m_gain_next[56] = m_coeffs[56] * (429 * sinE6 - 693 * sinE4 + 315 * sinE2 - 35) * sinE;
+            m_gain_next[57] = m_coeffs[57] * (429 * sinE6 - 495 * sinE4 + 135 * sinE2 - 5) * cosE * cosA;
+            m_gain_next[58] = m_coeffs[58] * (143 * sinE4 - 110 * sinE2 + 15) * sinE * cosE2 * cos2A;
+            m_gain_next[59] = m_coeffs[59] * (4 * sinA2 - 1) * (143 * sinE4 - 66 * sinE2 + 3) * cosE3 * cosA;
+            m_gain_next[60] = m_coeffs[60] * (13 * sinE2 - 3) * (8 * sinA4 - 8 * sinA2 + 1) * sinE * cosE4;
+            m_gain_next[61] = m_coeffs[61] * (13 * sinE2 - 1) * (16 * sinA4 - 12 * sinA2 + 1) * cosE3 * cosA;
+            m_gain_next[62] = m_coeffs[62] * (2 * sinE * cos6A) * cos2E_13;
+            m_gain_next[63] = m_coeffs[63] * (-63 * sinA6 + 77 * sinA4 - 21 * sinA2 + cosA6) * cosE7 * cosA;
         }
     }
 
     // instance data
     t_CKINT m_order;
     t_CKINT m_out_channels;
+    t_CKINT m_update_period;
+    t_CKINT m_samples_left;
+    t_CKINT m_dirty;
 
     t_CKFLOAT m_azimuth;
     t_CKFLOAT m_elevation;
+
     t_CKFLOAT m_coeffs[MAX_CHANNELS];
-    t_CKFLOAT m_gain[MAX_CHANNELS];
+    t_CKFLOAT m_gain_next[MAX_CHANNELS];
+    t_CKFLOAT m_gain_cur[MAX_CHANNELS];
+    t_CKFLOAT m_gain_step[MAX_CHANNELS];
 };
 
 
@@ -439,11 +506,16 @@ CK_DLL_QUERY( AmbPanACN )
 
     // register default constructor
     QUERY->add_ctor( QUERY, ambpanacn_ctor );
+    QUERY->doc_func( QUERY, "Default constructor. Defaults to 3rd order and a 64 sample update period" );
+
+    QUERY->add_ctor( QUERY, ambpanacn_ctor_order );
     QUERY->add_arg( QUERY, "int", "order" );
     QUERY->doc_func( QUERY, "Constructor that takes in the ambisonics order" );
-    // NOTE constructors can be overloaded like any other functions,
-    // each overloaded constructor begins with `QUERY->add_ctor()`
-    // followed by a sequence of `QUERY->add_arg()`
+
+    QUERY->add_ctor( QUERY, ambpanacn_ctor_orderAndPeriod );
+    QUERY->add_arg( QUERY, "int", "order" );
+    QUERY->add_arg( QUERY, "int", "updatePeriod" );
+    QUERY->doc_func( QUERY, "Constructor that takes in the ambisonics order and updatePeriod" );
 
     // register the destructor (probably no need to change)
     QUERY->add_dtor( QUERY, ambpanacn_dtor );
@@ -469,6 +541,10 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_arg( QUERY, "float", "e" );
     QUERY->doc_func( QUERY, "Set both vertical and horizontal angle of point source" );
 
+    QUERY->add_mfun( QUERY, ambpanacn_setUpdatePeriod, "int", "updatePeriod" );
+    QUERY->add_arg( QUERY, "int", "p" );
+    QUERY->doc_func( QUERY, "Set the number of samples for gain interpolation. A value of 1 means the values will be recomputed every sample" );
+
     // getters
     QUERY->add_mfun( QUERY, ambpanacn_getAzimuth, "float", "azimuth" );
     QUERY->doc_func( QUERY, "Get horizontal angle of point source" );
@@ -481,6 +557,9 @@ CK_DLL_QUERY( AmbPanACN )
 
     QUERY->add_mfun( QUERY, ambpanacn_getOutChannels, "int", "outChannels" );
     QUERY->doc_func( QUERY, "Get number of channels needed for the order (e.g. 3rd order returns 16)" );
+
+    QUERY->add_mfun( QUERY, ambpanacn_getUpdatePeriod, "int", "updatePeriod" );
+    QUERY->doc_func( QUERY, "Get the number of samples between recomputing gain values" );
 
     // this reserves a variable in the ChucK internal class to store
     // referene to the c++ class we defined above
@@ -503,11 +582,41 @@ CK_DLL_CTOR( ambpanacn_ctor )
     // get the offset where we'll store our internal c++ class pointer
     OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = 0;
 
+    // instantiate our internal c++ class representation
+    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), 3, 64 );
+
+    // store the pointer in the ChucK object member
+    OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = (t_CKINT)apacn_obj;
+}
+
+
+CK_DLL_CTOR( ambpanacn_ctor_order )
+{
+    // get the offset where we'll store our internal c++ class pointer
+    OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = 0;
+
     // Get constructor arguments
     t_CKINT arg1 = GET_NEXT_INT( ARGS );
 
     // instantiate our internal c++ class representation
-    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), arg1 );
+    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), arg1, 64 );
+
+    // store the pointer in the ChucK object member
+    OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = (t_CKINT)apacn_obj;
+}
+
+
+CK_DLL_CTOR( ambpanacn_ctor_orderAndPeriod )
+{
+    // get the offset where we'll store our internal c++ class pointer
+    OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = 0;
+
+    // Get constructor arguments
+    t_CKINT arg1 = GET_NEXT_INT( ARGS );
+    t_CKINT arg2 = GET_NEXT_INT( ARGS );
+
+    // instantiate our internal c++ class representation
+    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), arg1, arg2 );
 
     // store the pointer in the ChucK object member
     OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = (t_CKINT)apacn_obj;
@@ -587,6 +696,21 @@ CK_DLL_MFUN( ambpanacn_set )
 }
 
 
+CK_DLL_MFUN( ambpanacn_setUpdatePeriod )
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // get next argument
+    // NOTE argument type must match what is specified above in CK_DLL_QUERY
+    // NOTE this advances the ARGS pointer, so save in variable for re-use
+    t_CKFLOAT arg1 = GET_NEXT_INT( ARGS );
+
+    // call setUpdatePeriod() and set the return value
+    RETURN->v_int = apacn_obj->setUpdatePeriod( arg1 );
+}
+
+
 // getters
 CK_DLL_MFUN(ambpanacn_getAzimuth)
 {
@@ -625,4 +749,14 @@ CK_DLL_MFUN(ambpanacn_getOutChannels)
 
     // call getOutChannels() and set the return value
     RETURN->v_int = apacn_obj->getOutChannels();
+}
+
+
+CK_DLL_MFUN(ambpanacn_getUpdatePeriod)
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // call getUpdatePeriod() and set the return value
+    RETURN->v_int = apacn_obj->getUpdatePeriod();
 }
