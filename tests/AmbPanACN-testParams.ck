@@ -23,6 +23,7 @@ fun int assert(float actual, float expected) {
 ConsoleInput in;
 StringTokenizer tok;
 
+// Prompt for ambisonics order
 in.prompt("Ambisonic order to test (e.g. 1 - 7): ") => now;
 string userInput;
 int order;
@@ -42,10 +43,30 @@ if (order < 1 || order > 7) {
     cherr <= "Invalid order provided: \"" <= userInput <= "\". Order must be between 1 and 7" <= IO.nl();
     me.exit();
 }
+
+// Prompt for updateSamples
+in.prompt("Number of samples per update (e.g. a power of 2, like 64): ") => now;
+int updatePeriod;
+
+
+while (in.more()) {
+    tok.set(in.getLine());
+
+    if (tok.more()) {
+        tok.next() => userInput;
+        userInput.toInt() => updatePeriod;
+    }
+}
+
+// Error checking
+if (updatePeriod < 1) {
+    cherr <= "Invalid sample period provided: \"" <= userInput <= "\". Must be greater than 0." <= IO.nl();
+    me.exit();
+}
 chout <= IO.nl();
 
 // instantiate a AmbPanACN
-AmbPanACN amb(order);
+AmbPanACN amb(order, updatePeriod);
 
 chout <= "Printing out amb.help() function" <= IO.nl();
 amb.help();
@@ -73,6 +94,9 @@ assert(amb.azimuth(), pi / 2.);
 
 assert(amb.elevation(), pi / 4.);
 <<< "    Elevation:", amb.elevation() >>>;
+
+assert(amb.updatePeriod(), updatePeriod);
+<<< "    Update period:", amb.updatePeriod() >>>;
 
 // Test return values for set
 amb.set(pi, pi / 2.) => vec2 ret;

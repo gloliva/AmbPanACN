@@ -50,9 +50,9 @@ SawOsc osc2(Math.mtof(63)) => AmbPanACN amb2(order) => dac;
 SawOsc osc3(Math.mtof(70)) => AmbPanACN amb3(order) => dac;
 
 // Set gains
-0.33 => osc.gain;
-0.33 => osc2.gain;
-0.33 => osc3.gain;
+0.25 => osc.gain;
+0.25 => osc2.gain;
+0.25 => osc3.gain;
 
 
 // Handle automation

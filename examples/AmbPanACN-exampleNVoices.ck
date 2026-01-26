@@ -22,6 +22,7 @@
 ConsoleInput in;
 StringTokenizer tok;
 
+// Prompt for order
 in.prompt("Ambisonic order to test (e.g. 1 - 7): ") => now;
 string userInput;
 int order;
@@ -42,7 +43,28 @@ if (order < 1 || order > 7) {
     me.exit();
 }
 
+// Prompt for updateSamples
+in.prompt("Number of samples per update (e.g. a power of 2, like 64): ") => now;
+int updatePeriod;
 
+
+while (in.more()) {
+    tok.set(in.getLine());
+
+    if (tok.more()) {
+        tok.next() => userInput;
+        userInput.toInt() => updatePeriod;
+    }
+}
+
+// Error checking
+if (updatePeriod < 1) {
+    cherr <= "Invalid sample period provided: \"" <= userInput <= "\". Must be greater than 0." <= IO.nl();
+    me.exit();
+}
+
+
+// Prompt for voices
 in.prompt("How many voices to create (e.g. 8). Stops working ~20 voices: ") => now;
 int numVoices;
 
@@ -78,7 +100,7 @@ SinOsc lfosE[0];
 repeat (numVoices) {
     // Osc and Amb
     oscs << new SawOsc(Math.mtof(Math.random2(30, 91)));
-    pans << new AmbPanACN(order);
+    pans << new AmbPanACN(order, updatePeriod);
 
     // LFOs
     lfosA << new SinOsc(Math.random2f(0.05, 2.));
