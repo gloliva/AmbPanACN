@@ -103,7 +103,7 @@ When connecting an `AmbPanACN` object to the DAC, if the DAC is the exact number
 AmbPanACN pan(5) => dac;
 ```
 
-However, if you are using less than 64 channels (i.e. less than 7th order) and you intend to use the remaining channels, you will want to connect each channel of the panner to the DAC manually. An example of this would be your DAC is 45 channels, and you are using the first 36 channels for a 5th order decoder, and the remaining 9 channels for a 2nd order decoder. You can connect channels manually like this:
+However, if you are using less than 64 channels (i.e. less than 7th order) for a panner and you intend to use the remaining channels for something else, you will want to connect each channel of the panner to the DAC manually. An example of this would be your DAC is 45 channels, and you are using the first 36 channels for a 5th order decoder, and the remaining 9 channels for a 2nd order decoder. You can connect channels manually like this:
 
 ```java
 // Define 5th order and 2nd order panners
