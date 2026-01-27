@@ -92,3 +92,33 @@ For automating these values, one approach is to use the `Patch` and `Range` clas
 ```
 
 A larger example with three voices can be viewed in `examples/AmbPanACN-example3Voices.ck`.
+
+### Caveats
+
+Due to how ChucK currently handles creating multichannel UGens, and in order to have only 1 ambisonics encoder class (as opposed to `AmbPanACN1`, `AmbPanACN2`, ..., `AmpPanACN7`), `AmbPanACN` is a 64 channel UGen regardless of order (however, it only does the calculations for the order that is set).
+
+When connecting an `AmbPanACN` object to the DAC, if the DAC is the exact number of channels as is needed by the ambisonics order, or if the remaining channels are uneeded/unused (e.g. output device supports 64 channels, but you are only using the first 36 for 5th order ambisonics), then you can connect the panner to the DAC with the `=>` operator:
+
+```code
+AmbPanACN pan(5) => dac;
+```
+
+However, if you are using less than 64 channels (i.e. less than 7th order) and you intend to use the remaining channels, you will want to connect each channel of the panner to the DAC manually. An example of this would be your DAC is 45 channels, and you are using the first 36 channels for a 5th order decoder, and the remaining 9 channels for a 2nd order decoder. You can connect channels manually like this:
+
+```code
+// Define 5th order and 2nd order panners
+AmbPanACN pan5(5);
+AmbPanACN pan2(2);
+
+// Connect the 5th order panner (36 channels) to DAC channels 0 - 35
+for (int c; c < pan5.outChannels(); c++) {
+    pan5.chan(c) => dac.chan(c);
+}
+
+// Connect the 2nd order panner (9 channels) to DAC channels 36 - 44
+for (36 => int c; c < pan2.outChannels(); c++) {
+    pan2.chan(c) => dac.chan(c);
+}
+```
+
+This ensures that only the used channels of the panner are connected to the DAC. Technically, all unused channels output a value of 0 each tick, but it is still advised to connect the channels manually in this situation.
