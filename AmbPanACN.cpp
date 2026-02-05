@@ -89,14 +89,16 @@ public:
         m_out_channels = (order+1) * (order+1);
         m_azimuth = 0;
         m_elevation = 0;
+        m_dirty = true;
 
         // Gain interpolation
-        m_update_period = update_period;
+        m_update_period = (update_period < 1 ? 1 : update_period);
         m_samples_left = 0;
 
         for (int c = 0; c < MAX_CHANNELS; c++)
         {
             m_gain_cur[c] = 0;
+            m_gain_next[c] = 0;
             m_gain_step[c] = 0;
         }
 
@@ -114,41 +116,58 @@ public:
     // for chugins extending UGen
     void tick( SAMPLE * in, SAMPLE * out, int nframes )
     {
-        // compute new gains only if updatePeriod samples have passed and azimuth and/or elevation has changed
-        if (m_samples_left <= 0 && m_dirty == true)
-        {
-            // Update gains based on new azimuth / elevation
-            compute_gains();
-
-            // Set gain step size
-            for (int c = 0; c < m_out_channels; c++)
+        for (int f = 0; f < nframes; f++) {
+            // compute new gains only if updatePeriod samples have passed and azimuth and/or elevation has changed
+            // if (m_samples_left <= 0)
+            if (m_samples_left <= 0 && m_dirty == true)
             {
-                m_gain_step[c] = (m_gain_next[c] - m_gain_cur[c]) / m_update_period;
+                // Update gains based on new azimuth / elevation
+                compute_gains();
+
+                // Set gain step size
+                for (int c = 0; c < m_out_channels; c++)
+                {
+                    m_gain_step[c] = (m_gain_next[c] - m_gain_cur[c]) / m_update_period;
+                }
+
+                m_samples_left = m_update_period;
+                m_dirty = false;
             }
 
-            m_samples_left = m_update_period;
-            m_dirty = false;
-        }
+            // Write only active channels
+            for(int c = 0; c < m_out_channels; c++)
+            {
+                out[(f * MAX_CHANNELS) + c] = m_gain_cur[c] * in[f];
+            }
 
-        // Write only active channels
-        for(int c = 0; c < m_out_channels; c++)
-        {
-            out[c] = m_gain_cur[c] * in[0];
-        }
+            // Zero out the rest
+            for(int c = m_out_channels; c < MAX_CHANNELS; c++)
+            {
+                out[(f * MAX_CHANNELS) + c] = 0.;
+            }
 
-        // Zero out the rest
-        for(int c = m_out_channels; c < MAX_CHANNELS; c++)
-        {
-            out[c] = 0.;
-        }
+            if (m_samples_left > 0) {
 
-        // Advance gains toward target
-        for (int c = 0; c < m_out_channels; c++) {
-            m_gain_cur[c] += m_gain_step[c];
-        }
+                // Advance gains toward target
+                for (int c = 0; c < m_out_channels; c++) {
+                    m_gain_cur[c] += m_gain_step[c];
+                }
 
-        // Decrement sample counter
-        m_samples_left--;
+                // Decrement sample counter
+                m_samples_left--;
+
+                // Stop exactly at target
+                if (m_samples_left == 0)
+                {
+                    for (int c = 0; c < m_out_channels; ++c)
+                    {
+                        m_gain_cur[c] = m_gain_next[c];
+                        m_gain_step[c] = 0;
+                    }
+                }
+            }
+
+        }
     }
 
     // setters
@@ -187,7 +206,7 @@ public:
 
     t_CKINT setUpdatePeriod( t_CKINT p )
     {
-        m_update_period = p;
+        m_update_period = (p < 1 ? 1 : p);
         m_samples_left = 0;
         return m_update_period;
     }
