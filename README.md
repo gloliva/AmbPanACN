@@ -88,7 +88,7 @@ For automating these values, one approach is to use the `Patch` and `Range` clas
 SinOsc osc(440.) => AmbPanACN pan(5) => dac;
 
 // Automate azimuth with a SinOsc LFO
-SinOsc lfo(0.1) => Range r(pi / 2., -pi / 2.) => Patch p(amb2, "azimuth") => blackhole;
+SinOsc lfo(0.1) => Range r(pi / 2., -pi / 2.) => Patch p(pan, "azimuth") => blackhole;
 ```
 
 A larger example with three voices can be viewed in `examples/AmbPanACN-example3Voices.ck`.
