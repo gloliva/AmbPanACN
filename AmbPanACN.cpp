@@ -72,6 +72,7 @@ CK_DLL_MFUN( ambpanacn_setVelocities );
 CK_DLL_MFUN( ambpanacn_pan );
 CK_DLL_MFUN( ambpanacn_set );
 CK_DLL_MFUN( ambpanacn_setUpdatePeriod );
+CK_DLL_MFUN( ambpanacn_setOrder );
 
 // declaration of getters
 CK_DLL_MFUN( ambpanacn_getAzimuth );
@@ -321,6 +322,13 @@ public:
         m_update_period = p;
         m_samples_left = 0;
         return m_update_period;
+    }
+
+    t_CKINT setOrder( t_CKINT order )
+    {
+        m_order = order;
+        m_out_channels = (order+1) * (order+1);
+        return order;
     }
 
     // getters
@@ -728,6 +736,10 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_arg( QUERY, "float", "e_v" );
     QUERY->doc_func( QUERY, "Set vertical and horizontal angle and velocities of point source" );
 
+    QUERY->add_mfun( QUERY, ambpanacn_setOrder, "int", "order" );
+    QUERY->add_arg( QUERY, "int", "o" );
+    QUERY->doc_func( QUERY, "Set ambisonics order" );
+
     QUERY->add_mfun( QUERY, ambpanacn_setUpdatePeriod, "int", "updatePeriod" );
     QUERY->add_arg( QUERY, "int", "p" );
     QUERY->doc_func( QUERY, "Set the number of samples for gain interpolation. A value of 1 means the values will be recomputed every sample" );
@@ -1000,6 +1012,20 @@ CK_DLL_MFUN( ambpanacn_setUpdatePeriod )
 
     // call setUpdatePeriod() and set the return value
     RETURN->v_int = apacn_obj->setUpdatePeriod( arg1 );
+}
+
+CK_DLL_MFUN( ambpanacn_setOrder )
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // get next argument
+    // NOTE argument type must match what is specified above in CK_DLL_QUERY
+    // NOTE this advances the ARGS pointer, so save in variable for re-use
+    t_CKFLOAT arg1 = GET_NEXT_INT( ARGS );
+
+    // call setUpdatePeriod() and set the return value
+    RETURN->v_int = apacn_obj->setOrder( arg1 );
 }
 
 // getters

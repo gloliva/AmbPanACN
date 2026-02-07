@@ -105,7 +105,14 @@ assert(amb.NORMALIZED, 0);
 assert(amb.RADIANS, 1);
 <<< "    Radians static variable:", AmbPanACN.RADIANS >>>;
 
-// Test return values for set
+// Test return values for pan
 amb.pan(pi, pi / 2.) => vec2 ret;
 assert(ret.x, pi);
 assert(ret.y, pi / 2.);
+
+// Change order and test
+for (1 => int order; order < 8; order++) {
+    order => amb.order;
+    assert(amb.order(), order);
+    assert(amb.outChannels(), Math.pow(order+1, 2));
+}
