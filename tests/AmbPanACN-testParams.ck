@@ -66,7 +66,7 @@ if (updatePeriod < 1) {
 chout <= IO.nl();
 
 // instantiate a AmbPanACN
-AmbPanACN amb(order, updatePeriod);
+AmbPanACN amb(order, updatePeriod, AmbPanACN.RADIANS);
 
 chout <= "Printing out amb.help() function" <= IO.nl();
 amb.help();
@@ -100,12 +100,12 @@ assert(amb.updatePeriod(), updatePeriod);
 
 // Test static variables
 assert(amb.NORMALIZED, 0);
-<<< "    Normalized static variable:", amb.NORMALIZED >>>;
+<<< "    Normalized static variable:", AmbPanACN.NORMALIZED >>>;
 
 assert(amb.RADIANS, 1);
-<<< "    Radians static variable:", amb.RADIANS >>>;
+<<< "    Radians static variable:", AmbPanACN.RADIANS >>>;
 
 // Test return values for set
-amb.set(pi, pi / 2.) => vec2 ret;
+amb.pan(pi, pi / 2.) => vec2 ret;
 assert(ret.x, pi);
 assert(ret.y, pi / 2.);

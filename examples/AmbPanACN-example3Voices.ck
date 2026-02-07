@@ -46,8 +46,8 @@ if (order < 1 || order > 7) {
 
 // instantiate AmbPanACNs
 PulseOsc osc(Math.mtof(60)) => AmbPanACN amb(order) => dac;
-SawOsc osc2(Math.mtof(63)) => AmbPanACN amb2(order) => dac;
-SawOsc osc3(Math.mtof(70)) => AmbPanACN amb3(order) => dac;
+SawOsc osc2(Math.mtof(63)) => AmbPanACN amb2(order, 64, AmbPanACN.RADIANS) => dac;
+SawOsc osc3(Math.mtof(70)) => AmbPanACN amb3(order, 64, AmbPanACN.RADIANS) => dac;
 
 // Set gains
 0.25 => osc.gain;
@@ -57,7 +57,7 @@ SawOsc osc3(Math.mtof(70)) => AmbPanACN amb3(order) => dac;
 
 // Handle automation
 // Amb1
-Phasor phase(0.5) => Range r(0, 1, -pi, pi) => Patch p(amb, "azimuth") => blackhole;
+Phasor phase(0.5) => Range r(0, 1, -1, 1) => Patch p(amb, "azimuth") => blackhole;
 
 // Amb2
 Phasor phase2(0.8) => Range r2(0, 1, pi, -pi) => Patch p2(amb2, "azimuth") => blackhole;

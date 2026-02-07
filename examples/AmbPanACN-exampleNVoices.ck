@@ -100,7 +100,7 @@ SinOsc lfosE[0];
 repeat (numVoices) {
     // Osc and Amb
     oscs << new SawOsc(Math.mtof(Math.random2(30, 91)));
-    pans << new AmbPanACN(order, updatePeriod);
+    pans << new AmbPanACN(order, updatePeriod, AmbPanACN.RADIANS);
 
     // LFOs
     lfosA << new SinOsc(Math.random2f(0.05, 2.));

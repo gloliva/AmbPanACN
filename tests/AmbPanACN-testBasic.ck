@@ -52,7 +52,7 @@ chout <= "Ambisonic order: " <= amb.order() <= ". Number of out channels: " <= a
 
 
 // Set phasor to control azimuth
-Phasor phase(0.25) => Range r(0, 1, -pi, pi) => Patch p(amb, "azimuth") => blackhole;
+Phasor phase(0.25) => Range r(0, 1, -1., 1.) => Patch p(amb, "azimuth") => blackhole;
 
 // Wait forever
 eon => now;
