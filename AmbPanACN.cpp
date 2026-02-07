@@ -41,15 +41,22 @@
 // general includes
 #include <stdio.h>
 #include <iostream>
-#include <math.h>
+// #include <math.h>
+#include <cmath>
 
 // constants
 const int MAX_CHANNELS = 64;
+
+// static variables
+static t_CKUINT amb_bounds_normalized = 0;
+static t_CKUINT amb_bounds_radians = 1;
 
 // declaration of chugin constructor
 CK_DLL_CTOR( ambpanacn_ctor );
 CK_DLL_CTOR( ambpanacn_ctor_order );
 CK_DLL_CTOR( ambpanacn_ctor_orderAndPeriod );
+CK_DLL_CTOR( ambpanacn_ctor_orderAndPeriodAndBounds );
+
 // declaration of chugin desctructor
 CK_DLL_DTOR( ambpanacn_dtor );
 
@@ -89,7 +96,7 @@ class AmbPanACN
 {
 public:
     // constructor
-    AmbPanACN( t_CKFLOAT fs, t_CKINT order, t_CKDUR update_period )
+    AmbPanACN( t_CKFLOAT fs, t_CKINT order, t_CKDUR update_period, t_CKINT bounds_type )
     {
         m_order = order;
         m_out_channels = (order+1) * (order+1);
@@ -101,6 +108,7 @@ public:
         srate = fs;
         m_path = false;
         m_path_samples_left = -1;
+        m_bounds_type = bounds_type;
 
         // Gain interpolation
         m_update_period = (update_period < 1 ? 1 : update_period);
@@ -201,6 +209,11 @@ public:
     // setters
     t_CKFLOAT setAzimuth( t_CKFLOAT a )
     {
+        // Scale [-1, 1] to [-PI, PI]
+        if (m_bounds_type == amb_bounds_normalized) {
+            a = scalef(a, -1.0, 1., -1 * M_PI, M_PI);
+        }
+
         if (a != m_azimuth)
         {
             m_azimuth = a - m_azi_velocity;
@@ -211,6 +224,11 @@ public:
 
     t_CKFLOAT setElevation( t_CKFLOAT e )
     {
+        // Scale [-1, 1] to [-PI, PI]
+        if (m_bounds_type == amb_bounds_normalized) {
+            e = scalef(e, -1.0, 1., -1 * M_PI, M_PI);
+        }
+
         if (e != m_elevation)
         {
             m_elevation = e - m_ele_velocity;
@@ -252,9 +270,15 @@ public:
         retVec.y = m_ele_velocity;
         return retVec;
     }
-    
+
     t_CKVEC2 pan( t_CKFLOAT a, t_CKFLOAT e)
     {
+        // Scale [-1, 1] to [-PI, PI]
+        if (m_bounds_type == amb_bounds_normalized) {
+            a = scalef(a, -1.0, 1., -1 * M_PI, M_PI);
+            e = scalef(e, -1.0, 1., -1 * M_PI, M_PI);
+        }
+
         m_azimuth = a - m_azi_velocity;
         m_elevation = e - m_ele_velocity;
         m_pan_change = true;
@@ -268,11 +292,17 @@ public:
 
     t_CKVEC4 set( t_CKFLOAT a, t_CKFLOAT e, t_CKFLOAT a_v, t_CKFLOAT e_v)
     {
+        // Scale [-1, 1] to [-PI, PI]
+        if (m_bounds_type == amb_bounds_normalized) {
+            a = scalef(a, -1.0, 1., -1 * M_PI, M_PI);
+            e = scalef(e, -1.0, 1., -1 * M_PI, M_PI);
+        }
+
         m_azi_velocity = a_v * m_update_period / srate;
         m_ele_velocity = e_v * m_update_period / srate;
         m_azimuth = a - m_azi_velocity;
         m_elevation = e - m_ele_velocity;
-    
+
         // Return a vector with azimuth and elevation
         t_CKVEC4 retVec;
         retVec.w = m_azimuth;
@@ -558,6 +588,12 @@ private:
         }
     }
 
+    // Helper functions
+    float scalef(float x, float in_min, float in_max, float out_min, float out_max)
+    {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    }
+
     // instance data
     t_CKINT m_order;
     t_CKINT m_out_channels;
@@ -565,7 +601,8 @@ private:
     t_CKINT m_samples_left;
     t_CKINT m_pan_change;
     t_CKINT m_path;
-    t_CKDUR m_path_samples_left; 
+    t_CKDUR m_path_samples_left;
+    t_CKINT m_bounds_type;
 
     t_CKFLOAT m_azimuth;
     t_CKFLOAT m_elevation;
@@ -632,6 +669,12 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_arg( QUERY, "int", "updatePeriod" );
     QUERY->doc_func( QUERY, "Constructor that takes in the ambisonics order and updatePeriod" );
 
+    QUERY->add_ctor( QUERY, ambpanacn_ctor_orderAndPeriodAndBounds );
+    QUERY->add_arg( QUERY, "int", "order" );
+    QUERY->add_arg( QUERY, "int", "updatePeriod" );
+    QUERY->add_arg( QUERY, "int", "boundsType" );
+    QUERY->doc_func( QUERY, "Constructor that takes in the ambisonics order, updatePeriod, and boundsType" );
+
     // register the destructor (probably no need to change)
     QUERY->add_dtor( QUERY, ambpanacn_dtor );
 
@@ -648,7 +691,7 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_arg( QUERY, "float", "final_a" );
     QUERY->add_arg( QUERY, "float", "final_e" );
     QUERY->add_arg( QUERY, "dur", "path_time" );
-    
+
     QUERY->doc_func( QUERY, "Set velocity of horizontal / vertical angles of point source" );
 
     // setters
@@ -711,6 +754,10 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_mfun( QUERY, ambpanacn_getUpdatePeriod, "int", "updatePeriod" );
     QUERY->doc_func( QUERY, "Get the number of samples between recomputing gain values" );
 
+    // Static variables
+    QUERY->add_svar( QUERY, "int", "NORMALIZED", true, (void *)&amb_bounds_normalized);
+    QUERY->add_svar( QUERY, "int", "RADIANS", true, (void *)&amb_bounds_radians);
+
     // this reserves a variable in the ChucK internal class to store
     // referene to the c++ class we defined above
     ambpanacn_data_offset = QUERY->add_mvar( QUERY, "int", "@apacn_data", false );
@@ -733,7 +780,7 @@ CK_DLL_CTOR( ambpanacn_ctor )
     OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = 0;
 
     // instantiate our internal c++ class representation
-    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), 3, 64 );
+    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), 3, 64, amb_bounds_normalized );
 
     // store the pointer in the ChucK object member
     OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = (t_CKINT)apacn_obj;
@@ -749,7 +796,7 @@ CK_DLL_CTOR( ambpanacn_ctor_order )
     t_CKINT arg1 = GET_NEXT_INT( ARGS );
 
     // instantiate our internal c++ class representation
-    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), arg1, 64 );
+    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), arg1, 64, amb_bounds_normalized );
 
     // store the pointer in the ChucK object member
     OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = (t_CKINT)apacn_obj;
@@ -766,7 +813,25 @@ CK_DLL_CTOR( ambpanacn_ctor_orderAndPeriod )
     t_CKINT arg2 = GET_NEXT_INT( ARGS );
 
     // instantiate our internal c++ class representation
-    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), arg1, arg2 );
+    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), arg1, arg2, amb_bounds_normalized );
+
+    // store the pointer in the ChucK object member
+    OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = (t_CKINT)apacn_obj;
+}
+
+
+CK_DLL_CTOR( ambpanacn_ctor_orderAndPeriodAndBounds )
+{
+    // get the offset where we'll store our internal c++ class pointer
+    OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = 0;
+
+    // Get constructor arguments
+    t_CKINT arg1 = GET_NEXT_INT( ARGS );
+    t_CKINT arg2 = GET_NEXT_INT( ARGS );
+    t_CKINT arg3 = GET_NEXT_INT( ARGS );
+
+    // instantiate our internal c++ class representation
+    AmbPanACN * apacn_obj = new AmbPanACN( API->vm->srate(VM), arg1, arg2, arg3 );
 
     // store the pointer in the ChucK object member
     OBJ_MEMBER_INT( SELF, ambpanacn_data_offset ) = (t_CKINT)apacn_obj;
@@ -812,7 +877,7 @@ CK_DLL_MFUN( ambpanacn_path )
     t_CKFLOAT arg3 = GET_NEXT_FLOAT( ARGS );
     t_CKFLOAT arg4 = GET_NEXT_FLOAT( ARGS );
     t_CKFLOAT arg5 = GET_NEXT_FLOAT( ARGS );
-    
+
     // call setAzimuth() and set the return value
     apacn_obj->path( arg1, arg2, arg3, arg4, arg5 );
 }

@@ -98,6 +98,13 @@ assert(amb.elevation(), pi / 4.);
 assert(amb.updatePeriod(), updatePeriod);
 <<< "    Update period:", amb.updatePeriod() >>>;
 
+// Test static variables
+assert(amb.NORMALIZED, 0);
+<<< "    Normalized static variable:", amb.NORMALIZED >>>;
+
+assert(amb.RADIANS, 1);
+<<< "    Radians static variable:", amb.RADIANS >>>;
+
 // Test return values for set
 amb.set(pi, pi / 2.) => vec2 ret;
 assert(ret.x, pi);
