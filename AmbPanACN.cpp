@@ -43,10 +43,8 @@
 #include <iostream>
 #include <math.h>
 
-
 // constants
 const int MAX_CHANNELS = 64;
-
 
 // declaration of chugin constructor
 CK_DLL_CTOR( ambpanacn_ctor );
@@ -55,15 +53,24 @@ CK_DLL_CTOR( ambpanacn_ctor_orderAndPeriod );
 // declaration of chugin desctructor
 CK_DLL_DTOR( ambpanacn_dtor );
 
+// declaration of ZAmbPan functions
+CK_DLL_MFUN( ambpanacn_path );
+
 // declaration of setters
 CK_DLL_MFUN( ambpanacn_setAzimuth );
 CK_DLL_MFUN( ambpanacn_setElevation );
+CK_DLL_MFUN( ambpanacn_setAzimuthVelocity );
+CK_DLL_MFUN( ambpanacn_setElevationVelocity );
+CK_DLL_MFUN( ambpanacn_setVelocities );
+CK_DLL_MFUN( ambpanacn_pan );
 CK_DLL_MFUN( ambpanacn_set );
 CK_DLL_MFUN( ambpanacn_setUpdatePeriod );
 
 // declaration of getters
 CK_DLL_MFUN( ambpanacn_getAzimuth );
 CK_DLL_MFUN( ambpanacn_getElevation );
+CK_DLL_MFUN( ambpanacn_getAzimuthVelocity );
+CK_DLL_MFUN( ambpanacn_getElevationVelocity );
 CK_DLL_MFUN( ambpanacn_getOrder );
 CK_DLL_MFUN( ambpanacn_getOutChannels );
 CK_DLL_MFUN( ambpanacn_getUpdatePeriod );
@@ -74,7 +81,6 @@ CK_DLL_TICKF( ambpanacn_tickf );
 // this is a special offset reserved for chugin internal data
 t_CKINT ambpanacn_data_offset = 0;
 
-
 //-----------------------------------------------------------------------------
 // class definition for internal chugin data
 // (NOTE this isn't strictly necessary, but is one example of a recommended approach)
@@ -83,20 +89,24 @@ class AmbPanACN
 {
 public:
     // constructor
-    AmbPanACN( t_CKFLOAT fs, t_CKINT order, t_CKINT update_period )
+    AmbPanACN( t_CKFLOAT fs, t_CKINT order, t_CKDUR update_period )
     {
         m_order = order;
         m_out_channels = (order+1) * (order+1);
         m_azimuth = 0;
         m_elevation = 0;
-        m_dirty = true;
+        m_azi_velocity = 0;
+        m_ele_velocity = 0;
+        m_pan_change = true;
+        srate = fs;
+        m_path = false;
+        m_path_samples_left = -1;
 
         // Gain interpolation
         m_update_period = (update_period < 1 ? 1 : update_period);
         m_samples_left = 0;
 
-        for (int c = 0; c < MAX_CHANNELS; c++)
-        {
+        for (int c = 0; c < MAX_CHANNELS; c++) {
             m_gain_cur[c] = 0;
             m_gain_next[c] = 0;
             m_gain_step[c] = 0;
@@ -119,19 +129,25 @@ public:
         for (int f = 0; f < nframes; f++) {
             // compute new gains only if updatePeriod samples have passed and azimuth and/or elevation has changed
             // if (m_samples_left <= 0)
-            if (m_samples_left <= 0 && m_dirty == true)
-            {
+            if (m_samples_left <= 0 && (m_pan_change || m_path || m_azi_velocity != 0 || m_ele_velocity != 0)) {
+                m_azimuth += m_azi_velocity;
+                m_elevation += m_ele_velocity;
+                if (m_pan_change) m_path_samples_left = 0;
                 // Update gains based on new azimuth / elevation
                 compute_gains();
-
-                // Set gain step size
-                for (int c = 0; c < m_out_channels; c++)
-                {
-                    m_gain_step[c] = (m_gain_next[c] - m_gain_cur[c]) / m_update_period;
-                }
-
                 m_samples_left = m_update_period;
-                m_dirty = false;
+                m_pan_change = false;
+                m_path = false;
+            }
+
+            if (m_path_samples_left >= 0) {
+                m_path_samples_left--;
+                if (m_path_samples_left < 0) {
+                    m_path = false;
+                    m_azi_velocity = 0;
+                    m_ele_velocity = 0;
+                }
+                // std::cout << m_path_samples_left << '\t' << m_azimuth << '\t' << m_elevation << '\n';
             }
 
             // Write only active channels
@@ -147,7 +163,6 @@ public:
             }
 
             if (m_samples_left > 0) {
-
                 // Advance gains toward target
                 for (int c = 0; c < m_out_channels; c++) {
                     m_gain_cur[c] += m_gain_step[c];
@@ -166,8 +181,21 @@ public:
                     }
                 }
             }
-
         }
+    }
+
+    void path(t_CKFLOAT init_a, t_CKFLOAT init_e, t_CKFLOAT final_a, t_CKFLOAT final_e, t_CKDUR path_time) {
+        path_time = path_time <= m_update_period ? m_update_period: path_time;
+        path_time += fmod(m_update_period - path_time, m_update_period);
+
+        m_azi_velocity = (final_a - init_a) / path_time * m_update_period;
+        m_ele_velocity = (final_e - init_e) / path_time * m_update_period;
+        m_azimuth = init_a - m_azi_velocity;
+        m_elevation = init_e - m_ele_velocity;
+
+        m_pan_change = false;
+        m_path = true;
+        m_path_samples_left = path_time;
     }
 
     // setters
@@ -175,8 +203,8 @@ public:
     {
         if (a != m_azimuth)
         {
-            m_azimuth = a;
-            m_dirty = true;
+            m_azimuth = a - m_azi_velocity;
+            m_pan_change = true;
         }
         return m_azimuth;
     }
@@ -185,17 +213,51 @@ public:
     {
         if (e != m_elevation)
         {
-            m_elevation = e;
-            m_dirty = true;
+            m_elevation = e - m_ele_velocity;
+            m_pan_change = true;
         }
         return m_elevation;
     }
 
-    t_CKVEC2 set( t_CKFLOAT a, t_CKFLOAT e)
+    t_CKFLOAT setAzimuthVelocity( t_CKFLOAT a )
     {
-        m_azimuth = a;
-        m_elevation = e;
-        m_dirty = true;
+        a *= m_update_period / srate;
+        if (a != m_azi_velocity)
+        {
+            m_azi_velocity = a;
+        }
+        m_path_samples_left = -1;
+        return m_azi_velocity;
+    }
+
+    t_CKFLOAT setElevationVelocity( t_CKFLOAT e )
+    {
+        e *= m_update_period / srate;
+        if (e != m_ele_velocity)
+        {
+            m_ele_velocity = e;
+        }
+        m_path_samples_left = -1;
+        return m_ele_velocity;
+    }
+
+    t_CKVEC2 setVelocities( t_CKFLOAT a, t_CKFLOAT e )
+    {
+        m_azi_velocity = a * m_update_period / srate;
+        m_ele_velocity = e * m_update_period / srate;
+
+        // Return a vector with azimuth and elevation
+        t_CKVEC2 retVec;
+        retVec.x = m_azi_velocity;
+        retVec.y = m_ele_velocity;
+        return retVec;
+    }
+    
+    t_CKVEC2 pan( t_CKFLOAT a, t_CKFLOAT e)
+    {
+        m_azimuth = a - m_azi_velocity;
+        m_elevation = e - m_ele_velocity;
+        m_pan_change = true;
 
         // Return a vector with azimuth and elevation
         t_CKVEC2 retVec;
@@ -204,9 +266,29 @@ public:
         return retVec;
     }
 
-    t_CKINT setUpdatePeriod( t_CKINT p )
+    t_CKVEC4 set( t_CKFLOAT a, t_CKFLOAT e, t_CKFLOAT a_v, t_CKFLOAT e_v)
     {
-        m_update_period = (p < 1 ? 1 : p);
+        m_azi_velocity = a_v * m_update_period / srate;
+        m_ele_velocity = e_v * m_update_period / srate;
+        m_azimuth = a - m_azi_velocity;
+        m_elevation = e - m_ele_velocity;
+    
+        // Return a vector with azimuth and elevation
+        t_CKVEC4 retVec;
+        retVec.w = m_azimuth;
+        retVec.x = m_elevation;
+        retVec.y = m_azi_velocity;
+        retVec.z = m_ele_velocity;
+        return retVec;
+    }
+
+    t_CKINT setUpdatePeriod( t_CKDUR p )
+    {
+        p = (p < 1 ? 1 : p);
+        m_azi_velocity *= p / m_update_period;
+        m_ele_velocity *= p / m_update_period;
+        m_path_samples_left *= p / m_update_period;
+        m_update_period = p;
         m_samples_left = 0;
         return m_update_period;
     }
@@ -222,6 +304,16 @@ public:
         return m_elevation;
     }
 
+    t_CKFLOAT getAzimuthVelocity()
+    {
+        return m_azi_velocity / m_update_period * srate;
+    }
+
+    t_CKFLOAT getElevationVelocity()
+    {
+        return m_ele_velocity / m_update_period * srate;
+    }
+
     t_CKINT getOrder()
     {
         return m_order;
@@ -232,7 +324,7 @@ public:
         return m_out_channels;
     }
 
-    t_CKINT getUpdatePeriod()
+    t_CKDUR getUpdatePeriod()
     {
         return m_update_period;
     }
@@ -469,19 +561,23 @@ private:
     // instance data
     t_CKINT m_order;
     t_CKINT m_out_channels;
-    t_CKINT m_update_period;
+    t_CKDUR m_update_period;
     t_CKINT m_samples_left;
-    t_CKINT m_dirty;
+    t_CKINT m_pan_change;
+    t_CKINT m_path;
+    t_CKDUR m_path_samples_left; 
 
     t_CKFLOAT m_azimuth;
     t_CKFLOAT m_elevation;
+    t_CKFLOAT m_azi_velocity;
+    t_CKFLOAT m_ele_velocity;
+    t_CKFLOAT srate;
 
     t_CKFLOAT m_coeffs[MAX_CHANNELS];
     t_CKFLOAT m_gain_next[MAX_CHANNELS];
     t_CKFLOAT m_gain_cur[MAX_CHANNELS];
     t_CKFLOAT m_gain_step[MAX_CHANNELS];
 };
-
 
 //-----------------------------------------------------------------------------
 // info function: ChucK calls this when loading/probing the chugin
@@ -546,6 +642,15 @@ CK_DLL_QUERY( AmbPanACN )
     // e.g., a multichannel UGen -- will need to use add_ugen_funcf()
     // and declare a tickf function using CK_DLL_TICKF
 
+    QUERY->add_mfun( QUERY, ambpanacn_path, "void", "path" );
+    QUERY->add_arg( QUERY, "float", "init_a" );
+    QUERY->add_arg( QUERY, "float", "init_e" );
+    QUERY->add_arg( QUERY, "float", "final_a" );
+    QUERY->add_arg( QUERY, "float", "final_e" );
+    QUERY->add_arg( QUERY, "dur", "path_time" );
+    
+    QUERY->doc_func( QUERY, "Set velocity of horizontal / vertical angles of point source" );
+
     // setters
     QUERY->add_mfun( QUERY, ambpanacn_setAzimuth, "float", "azimuth" );
     QUERY->add_arg( QUERY, "float", "a" );
@@ -555,10 +660,30 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_arg( QUERY, "float", "e" );
     QUERY->doc_func( QUERY, "Set vertical angle of point source" );
 
-    QUERY->add_mfun( QUERY, ambpanacn_set, "vec2", "set" );
+    QUERY->add_mfun( QUERY, ambpanacn_setAzimuthVelocity, "float", "azi_velocity" );
+    QUERY->add_arg( QUERY, "float", "a" );
+    QUERY->doc_func( QUERY, "Set velocity of horizontal angle of point source" );
+
+    QUERY->add_mfun( QUERY, ambpanacn_setElevationVelocity, "float", "ele_velocity" );
+    QUERY->add_arg( QUERY, "float", "e" );
+    QUERY->doc_func( QUERY, "Set velocity of vertical angle of point source" );
+
+    QUERY->add_mfun( QUERY, ambpanacn_setVelocities, "float", "set_velocities" );
+    QUERY->add_arg( QUERY, "float", "a" );
+    QUERY->add_arg( QUERY, "float", "e" );
+    QUERY->doc_func( QUERY, "Set velocity of horizontal / vertical angles of point source" );
+
+    QUERY->add_mfun( QUERY, ambpanacn_pan, "vec2", "set" );
     QUERY->add_arg( QUERY, "float", "a" );
     QUERY->add_arg( QUERY, "float", "e" );
     QUERY->doc_func( QUERY, "Set both vertical and horizontal angle of point source" );
+
+    QUERY->add_mfun( QUERY, ambpanacn_set, "vec4", "set" );
+    QUERY->add_arg( QUERY, "float", "a" );
+    QUERY->add_arg( QUERY, "float", "e" );
+    QUERY->add_arg( QUERY, "float", "a_v" );
+    QUERY->add_arg( QUERY, "float", "e_v" );
+    QUERY->doc_func( QUERY, "Set vertical and horizontal angle and velocities of point source" );
 
     QUERY->add_mfun( QUERY, ambpanacn_setUpdatePeriod, "int", "updatePeriod" );
     QUERY->add_arg( QUERY, "int", "p" );
@@ -570,6 +695,12 @@ CK_DLL_QUERY( AmbPanACN )
 
     QUERY->add_mfun( QUERY, ambpanacn_getElevation, "float", "elevation" );
     QUERY->doc_func( QUERY, "Get vertical angle of point source" );
+
+    QUERY->add_mfun( QUERY, ambpanacn_getAzimuthVelocity, "float", "azi_velocity" );
+    QUERY->doc_func( QUERY, "Get velocity of horizontal angle of point source" );
+
+    QUERY->add_mfun( QUERY, ambpanacn_getElevationVelocity, "float", "ele_velocity" );
+    QUERY->doc_func( QUERY, "Get velocity of vertical angle of point source" );
 
     QUERY->add_mfun( QUERY, ambpanacn_getOrder, "int", "order" );
     QUERY->doc_func( QUERY, "Get ambisonics order" );
@@ -667,6 +798,24 @@ CK_DLL_TICKF( ambpanacn_tickf )
     return TRUE;
 }
 
+// setters
+CK_DLL_MFUN( ambpanacn_path )
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // get next argument
+    // NOTE argument type must match what is specified above in CK_DLL_QUERY
+    // NOTE this advances the ARGS pointer, so save in variable for re-use
+    t_CKFLOAT arg1 = GET_NEXT_FLOAT( ARGS );
+    t_CKFLOAT arg2 = GET_NEXT_FLOAT( ARGS );
+    t_CKFLOAT arg3 = GET_NEXT_FLOAT( ARGS );
+    t_CKFLOAT arg4 = GET_NEXT_FLOAT( ARGS );
+    t_CKFLOAT arg5 = GET_NEXT_FLOAT( ARGS );
+    
+    // call setAzimuth() and set the return value
+    apacn_obj->path( arg1, arg2, arg3, arg4, arg5 );
+}
 
 // setters
 CK_DLL_MFUN( ambpanacn_setAzimuth )
@@ -683,6 +832,20 @@ CK_DLL_MFUN( ambpanacn_setAzimuth )
     RETURN->v_float = apacn_obj->setAzimuth( arg1 );
 }
 
+// setters
+CK_DLL_MFUN( ambpanacn_setAzimuthVelocity )
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // get next argument
+    // NOTE argument type must match what is specified above in CK_DLL_QUERY
+    // NOTE this advances the ARGS pointer, so save in variable for re-use
+    t_CKFLOAT arg1 = GET_NEXT_FLOAT( ARGS );
+
+    // call setAzimuth() and set the return value
+    RETURN->v_float = apacn_obj->setAzimuthVelocity( arg1 );
+}
 
 CK_DLL_MFUN( ambpanacn_setElevation )
 {
@@ -698,6 +861,35 @@ CK_DLL_MFUN( ambpanacn_setElevation )
     RETURN->v_float = apacn_obj->setElevation( arg1 );
 }
 
+CK_DLL_MFUN( ambpanacn_setElevationVelocity )
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // get next argument
+    // NOTE argument type must match what is specified above in CK_DLL_QUERY
+    // NOTE this advances the ARGS pointer, so save in variable for re-use
+    t_CKFLOAT arg1 = GET_NEXT_FLOAT( ARGS );
+
+    // call setElevation() and set the return value
+    RETURN->v_float = apacn_obj->setElevationVelocity( arg1 );
+}
+
+CK_DLL_MFUN( ambpanacn_setVelocities )
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // get next argument
+    // NOTE argument type must match what is specified above in CK_DLL_QUERY
+    // NOTE this advances the ARGS pointer, so save in variable for re-use
+    t_CKFLOAT arg1 = GET_NEXT_FLOAT( ARGS );
+    t_CKFLOAT arg2 = GET_NEXT_FLOAT( ARGS );
+    
+
+    // call setElevation() and set the return value
+    RETURN->v_vec2 = apacn_obj->setVelocities( arg1, arg2 );
+}
 
 CK_DLL_MFUN( ambpanacn_set )
 {
@@ -709,11 +901,27 @@ CK_DLL_MFUN( ambpanacn_set )
     // NOTE this advances the ARGS pointer, so save in variable for re-use
     t_CKFLOAT arg1 = GET_NEXT_FLOAT( ARGS );
     t_CKFLOAT arg2 = GET_NEXT_FLOAT( ARGS );
-
-    // call set() and set the return value
-    RETURN->v_vec2 = apacn_obj->set( arg1, arg2 );
+    t_CKFLOAT arg3 = GET_NEXT_FLOAT( ARGS );
+    t_CKFLOAT arg4 = GET_NEXT_FLOAT( ARGS );
+    
+    // call setElevation() and set the return value
+    RETURN->v_vec4 = apacn_obj->set( arg1, arg2, arg3, arg4 );
 }
 
+CK_DLL_MFUN( ambpanacn_pan )
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // get next argument
+    // NOTE argument type must match what is specified above in CK_DLL_QUERY
+    // NOTE this advances the ARGS pointer, so save in variable for re-use
+    t_CKFLOAT arg1 = GET_NEXT_FLOAT( ARGS );
+    t_CKFLOAT arg2 = GET_NEXT_FLOAT( ARGS );
+
+    // call set() and set the return value
+    RETURN->v_vec2 = apacn_obj->pan( arg1, arg2 );
+}
 
 CK_DLL_MFUN( ambpanacn_setUpdatePeriod )
 {
@@ -729,7 +937,6 @@ CK_DLL_MFUN( ambpanacn_setUpdatePeriod )
     RETURN->v_int = apacn_obj->setUpdatePeriod( arg1 );
 }
 
-
 // getters
 CK_DLL_MFUN(ambpanacn_getAzimuth)
 {
@@ -740,6 +947,14 @@ CK_DLL_MFUN(ambpanacn_getAzimuth)
     RETURN->v_float = apacn_obj->getAzimuth();
 }
 
+CK_DLL_MFUN(ambpanacn_getAzimuthVelocity)
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // call getAzimuthVelocity() and set the return value
+    RETURN->v_float = apacn_obj->getAzimuthVelocity();
+}
 
 CK_DLL_MFUN(ambpanacn_getElevation)
 {
@@ -750,6 +965,14 @@ CK_DLL_MFUN(ambpanacn_getElevation)
     RETURN->v_float = apacn_obj->getElevation();
 }
 
+CK_DLL_MFUN(ambpanacn_getElevationVelocity)
+{
+    // get our c++ class pointer
+    AmbPanACN * apacn_obj = (AmbPanACN *)OBJ_MEMBER_INT( SELF, ambpanacn_data_offset );
+
+    // call getElevationVelocity() and set the return value
+    RETURN->v_float = apacn_obj->getElevationVelocity();
+}
 
 CK_DLL_MFUN(ambpanacn_getOrder)
 {
@@ -759,7 +982,6 @@ CK_DLL_MFUN(ambpanacn_getOrder)
     // call getOrder() and set the return value
     RETURN->v_int = apacn_obj->getOrder();
 }
-
 
 CK_DLL_MFUN(ambpanacn_getOutChannels)
 {
