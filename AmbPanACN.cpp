@@ -194,6 +194,14 @@ public:
     }
 
     void path(t_CKFLOAT init_a, t_CKFLOAT init_e, t_CKFLOAT final_a, t_CKFLOAT final_e, t_CKDUR path_time) {
+        // Scale [-1, 1] to [-PI, PI]
+        if (m_bounds_type == amb_bounds_normalized) {
+            init_a = scalef(init_a, -1.0, 1., -1 * M_PI, M_PI);
+            init_e = scalef(init_e, -1.0, 1., -1 * M_PI, M_PI);
+            final_a = scalef(final_a, -1.0, 1., -1 * M_PI, M_PI);
+            final_e = scalef(final_e, -1.0, 1., -1 * M_PI, M_PI);
+        }
+
         path_time = path_time <= m_update_period ? m_update_period: path_time;
         path_time += fmod(m_update_period - path_time, m_update_period);
 
@@ -238,32 +246,46 @@ public:
         return m_elevation;
     }
 
-    t_CKFLOAT setAzimuthVelocity( t_CKFLOAT a )
+    t_CKFLOAT setAzimuthVelocity( t_CKFLOAT a_v )
     {
-        a *= m_update_period / srate;
-        if (a != m_azi_velocity)
+    // Scale [-1, 1] to [-PI, PI]
+        if (m_bounds_type == amb_bounds_normalized) {
+            a_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
+        }
+        a_v *= m_update_period / srate;
+        if (a_v != m_azi_velocity)
         {
-            m_azi_velocity = a;
+            m_azi_velocity = a_v;
         }
         m_path_samples_left = -1;
         return m_azi_velocity;
     }
 
-    t_CKFLOAT setElevationVelocity( t_CKFLOAT e )
+    t_CKFLOAT setElevationVelocity( t_CKFLOAT e_v )
     {
-        e *= m_update_period / srate;
-        if (e != m_ele_velocity)
+        // Scale [-1, 1] to [-PI, PI]
+        if (m_bounds_type == amb_bounds_normalized) {
+            e_v = scalef(e_v, -1.0, 1., -1 * M_PI, M_PI);
+        }
+        e_v *= m_update_period / srate;
+        if (e_v != m_ele_velocity)
         {
-            m_ele_velocity = e;
+            m_ele_velocity = e_v;
         }
         m_path_samples_left = -1;
         return m_ele_velocity;
     }
 
-    t_CKVEC2 setVelocities( t_CKFLOAT a, t_CKFLOAT e )
+    t_CKVEC2 setVelocities( t_CKFLOAT a_v, t_CKFLOAT e_v )
     {
-        m_azi_velocity = a * m_update_period / srate;
-        m_ele_velocity = e * m_update_period / srate;
+        // Scale [-1, 1] to [-PI, PI]
+        if (m_bounds_type == amb_bounds_normalized) {
+            a_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
+            e_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
+        }
+
+        m_azi_velocity = a_v * m_update_period / srate;
+        m_ele_velocity = e_v * m_update_period / srate;
 
         // Return a vector with azimuth and elevation
         t_CKVEC2 retVec;
@@ -297,6 +319,8 @@ public:
         if (m_bounds_type == amb_bounds_normalized) {
             a = scalef(a, -1.0, 1., -1 * M_PI, M_PI);
             e = scalef(e, -1.0, 1., -1 * M_PI, M_PI);
+            a_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
+            e_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
         }
 
         m_azi_velocity = a_v * m_update_period / srate;
@@ -751,10 +775,10 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_mfun( QUERY, ambpanacn_getElevation, "float", "elevation" );
     QUERY->doc_func( QUERY, "Get vertical angle of point source" );
 
-    QUERY->add_mfun( QUERY, ambpanacn_getAzimuthVelocity, "float", "azi_velocity" );
+    QUERY->add_mfun( QUERY, ambpanacn_getAzimuthVelocity, "float", "aziVelocity" );
     QUERY->doc_func( QUERY, "Get velocity of horizontal angle of point source" );
 
-    QUERY->add_mfun( QUERY, ambpanacn_getElevationVelocity, "float", "ele_velocity" );
+    QUERY->add_mfun( QUERY, ambpanacn_getElevationVelocity, "float", "eleVelocity" );
     QUERY->doc_func( QUERY, "Get velocity of vertical angle of point source" );
 
     QUERY->add_mfun( QUERY, ambpanacn_getOrder, "int", "order" );
