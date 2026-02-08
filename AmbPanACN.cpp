@@ -735,15 +735,15 @@ CK_DLL_QUERY( AmbPanACN )
     QUERY->add_arg( QUERY, "float", "e" );
     QUERY->doc_func( QUERY, "Set vertical angle of point source" );
 
-    QUERY->add_mfun( QUERY, ambpanacn_setAzimuthVelocity, "float", "azi_velocity" );
+    QUERY->add_mfun( QUERY, ambpanacn_setAzimuthVelocity, "float", "aziVelocity" );
     QUERY->add_arg( QUERY, "float", "a" );
     QUERY->doc_func( QUERY, "Set velocity of horizontal angle of point source" );
 
-    QUERY->add_mfun( QUERY, ambpanacn_setElevationVelocity, "float", "ele_velocity" );
+    QUERY->add_mfun( QUERY, ambpanacn_setElevationVelocity, "float", "eleVelocity" );
     QUERY->add_arg( QUERY, "float", "e" );
     QUERY->doc_func( QUERY, "Set velocity of vertical angle of point source" );
 
-    QUERY->add_mfun( QUERY, ambpanacn_setVelocities, "float", "set_velocities" );
+    QUERY->add_mfun( QUERY, ambpanacn_setVelocities, "float", "setVelocities" );
     QUERY->add_arg( QUERY, "float", "a" );
     QUERY->add_arg( QUERY, "float", "e" );
     QUERY->doc_func( QUERY, "Set velocity of horizontal / vertical angles of point source" );
