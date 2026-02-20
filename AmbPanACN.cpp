@@ -106,8 +106,9 @@ public:
         m_azi_velocity = 0;
         m_ele_velocity = 0;
         m_pan_change = true;
+        m_velo_change = false;
         srate = fs;
-        m_path = false;
+        m_path_change = false;
         m_path_samples_left = -1;
         m_bounds_type = bounds_type;
 
@@ -138,21 +139,25 @@ public:
         for (int f = 0; f < nframes; f++) {
             // compute new gains only if updatePeriod samples have passed and azimuth and/or elevation has changed
             // if (m_samples_left <= 0)
-            if (m_samples_left <= 0 && (m_pan_change || m_path || m_azi_velocity != 0 || m_ele_velocity != 0)) {
+            if (    m_samples_left <= 0 &&
+                    (m_pan_change || m_velo_change || m_path_change) ||
+                    (m_azi_velocity != 0 || m_ele_velocity != 0)
+            ) {
                 m_azimuth += m_azi_velocity;
                 m_elevation += m_ele_velocity;
-                if (m_pan_change) m_path_samples_left = 0;
+                if (m_pan_change && !m_velo_change) m_path_samples_left = 0;
                 // Update gains based on new azimuth / elevation
                 compute_gains();
                 m_samples_left = m_update_period;
                 m_pan_change = false;
-                m_path = false;
+                m_velo_change = false;
+                m_path_change = false;
             }
 
             if (m_path_samples_left >= 0) {
                 m_path_samples_left--;
                 if (m_path_samples_left < 0) {
-                    m_path = false;
+                    m_path_change = false;
                     m_azi_velocity = 0;
                     m_ele_velocity = 0;
                 }
@@ -211,7 +216,7 @@ public:
         m_elevation = init_e - m_ele_velocity;
 
         m_pan_change = false;
-        m_path = true;
+        m_path_change = true;
         m_path_samples_left = path_time;
     }
 
@@ -257,6 +262,9 @@ public:
         {
             m_azi_velocity = a_v;
         }
+        
+        m_velo_change = true;
+        m_pan_change = false;
         m_path_samples_left = -1;
         return m_azi_velocity;
     }
@@ -272,6 +280,9 @@ public:
         {
             m_ele_velocity = e_v;
         }
+        
+        m_velo_change = true;
+        m_pan_change = false;
         m_path_samples_left = -1;
         return m_ele_velocity;
     }
@@ -281,12 +292,14 @@ public:
         // Scale [-1, 1] to [-PI, PI]
         if (m_bounds_type == amb_bounds_normalized) {
             a_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
-            e_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
+            e_v = scalef(e_v, -1.0, 1., -1 * M_PI, M_PI);
         }
 
         m_azi_velocity = a_v * m_update_period / srate;
         m_ele_velocity = e_v * m_update_period / srate;
-
+        m_velo_change = true;
+        m_pan_change = false;
+        
         // Return a vector with azimuth and elevation
         t_CKVEC2 retVec;
         retVec.x = m_azi_velocity;
@@ -305,7 +318,8 @@ public:
         m_azimuth = a - m_azi_velocity;
         m_elevation = e - m_ele_velocity;
         m_pan_change = true;
-
+        m_velo_change = false;
+        
         // Return a vector with azimuth and elevation
         t_CKVEC2 retVec;
         retVec.x = m_azimuth;
@@ -320,13 +334,15 @@ public:
             a = scalef(a, -1.0, 1., -1 * M_PI, M_PI);
             e = scalef(e, -1.0, 1., -1 * M_PI, M_PI);
             a_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
-            e_v = scalef(a_v, -1.0, 1., -1 * M_PI, M_PI);
+            e_v = scalef(e_v, -1.0, 1., -1 * M_PI, M_PI);
         }
 
         m_azi_velocity = a_v * m_update_period / srate;
         m_ele_velocity = e_v * m_update_period / srate;
         m_azimuth = a - m_azi_velocity;
         m_elevation = e - m_ele_velocity;
+        m_velo_change = true;
+        m_pan_change = false;
 
         // Return a vector with azimuth and elevation
         t_CKVEC4 retVec;
@@ -358,22 +374,30 @@ public:
     // getters
     t_CKFLOAT getAzimuth()
     {
-        return m_azimuth;
+        if (m_bounds_type == amb_bounds_normalized) {
+            return scalef(m_azimuth, -1 * M_PI, M_PI, -1.0, 1.0);
+        } else return m_azimuth;
     }
 
     t_CKFLOAT getElevation()
     {
-        return m_elevation;
+        if (m_bounds_type == amb_bounds_normalized) {
+            return scalef(m_elevation, -1 * M_PI, M_PI, -1.0, 1.0);
+        } else return m_elevation;
     }
 
     t_CKFLOAT getAzimuthVelocity()
     {
-        return m_azi_velocity / m_update_period * srate;
+        if (m_bounds_type == amb_bounds_normalized) {
+            return scalef(m_azi_velocity / m_update_period * srate, -1 * M_PI, M_PI, -1.0, 1.0);
+        } else return m_azi_velocity / m_update_period * srate;
     }
 
     t_CKFLOAT getElevationVelocity()
     {
-        return m_ele_velocity / m_update_period * srate;
+        if (m_bounds_type == amb_bounds_normalized) {
+            return scalef(m_ele_velocity / m_update_period * srate, -1 * M_PI, M_PI, -1.0, 1.0);
+        } else return m_ele_velocity / m_update_period * srate;
     }
 
     t_CKINT getOrder()
@@ -631,8 +655,11 @@ private:
     t_CKINT m_out_channels;
     t_CKDUR m_update_period;
     t_CKINT m_samples_left;
+
     t_CKINT m_pan_change;
-    t_CKINT m_path;
+    t_CKINT m_velo_change;
+    t_CKINT m_path_change;
+    
     t_CKDUR m_path_samples_left;
     t_CKINT m_bounds_type;
 
