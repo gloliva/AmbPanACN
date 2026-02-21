@@ -1,5 +1,5 @@
 /*
-    AmbPanACN-example.ck
+    AmbiPan-example.ck
 
     Generate N number of voices with random pannings.
 
@@ -9,9 +9,9 @@
         $ chump install Range
         ```
 
-    How to run (from AmbPanACN directory):
+    How to run (from AmbiPan directory):
         ```
-        $ chuck --chugin:./AmbPanACN.chug --dac:<DEVICE_FOR_AMBISONICS> --out:<NUM_OUTS_NEEDED_FOR_ORDER> tests/AmbPanACN-example.ck
+        $ chuck --chugin:./AmbiPan.chug --dac:<DEVICE_FOR_AMBISONICS> --out:<NUM_OUTS_NEEDED_FOR_ORDER> tests/AmbiPan-example.ck
         ```
 */
 
@@ -85,7 +85,7 @@ if (numVoices < 1) {
 }
 
 
-AmbPanACN pans[0];
+AmbiPan pans[0];
 SawOsc oscs[0];
 
 Patch patchesA[0];
@@ -100,7 +100,7 @@ SinOsc lfosE[0];
 repeat (numVoices) {
     // Osc and Amb
     oscs << new SawOsc(Math.mtof(Math.random2(30, 91)));
-    pans << new AmbPanACN(order, updatePeriod, AmbPanACN.RADIANS);
+    pans << new AmbiPan(order, updatePeriod, AmbiPan.RADIANS);
 
     // LFOs
     lfosA << new SinOsc(Math.random2f(0.05, 2.));

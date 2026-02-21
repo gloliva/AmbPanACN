@@ -1,5 +1,5 @@
 /*
-    AmbPanACN-testBasic.ck
+    AmbiPan-testBasic.ck
 
     Test basic automation of azimuth panning.
 
@@ -9,9 +9,9 @@
         $ chump install Range
         ```
 
-    How to run (from AmbPanACN directory):
+    How to run (from AmbiPan directory):
         ```
-        $ chuck --chugin:./AmbPanACN.chug --dac:<DEVICE_FOR_AMBISONICS> --out:<NUM_OUTS_NEEDED_FOR_ORDER> tests/AmbPanACN-testAzimuth.ck
+        $ chuck --chugin:./AmbiPan.chug --dac:<DEVICE_FOR_AMBISONICS> --out:<NUM_OUTS_NEEDED_FOR_ORDER> tests/AmbiPan-testAzimuth.ck
         ```
 */
 
@@ -43,8 +43,8 @@ if (order < 1 || order > 7) {
 }
 
 
-// instantiate a AmbPanACN
-CNoise noise => AmbPanACN amb(order) => dac;
+// instantiate a AmbiPan
+CNoise noise => AmbiPan amb(order) => dac;
 "pink" => noise.mode;
 
 chout <= "Dac channels: " <= dac.channels() <= IO.nl();

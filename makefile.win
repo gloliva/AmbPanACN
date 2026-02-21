@@ -10,17 +10,17 @@ MSBUILD=msbuild.exe
 # configuration
 ifneq (,$(CHUCK_DEBUG))
 CONFIG=Debug
-CHUG_BIN=Debug/AmbPanACN.chug
+CHUG_BIN=Debug/AmbiPan.chug
 else
 CONFIG=Release
-CHUG_BIN=Release/AmbPanACN.chug
+CHUG_BIN=Release/AmbiPan.chug
 endif
 
 # targets
 default: $(CHUG_BIN)
 
-$(CHUG_BIN): 
-	$(MSBUILD) /p:Configuration=$(CONFIG) 
+$(CHUG_BIN):
+	$(MSBUILD) /p:Configuration=$(CONFIG)
 
 clean:
 	$(MSBUILD) /p:Configuration=$(CONFIG) /t:Clean

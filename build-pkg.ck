@@ -14,7 +14,7 @@ if (!(os == "mac" | os == "win" | os == "linux")) {
 }
 
 // instantiate a Chumpinate package
-Package pkg("AmbPanACN");
+Package pkg("AmbiPan");
 
 // add our metadata here
 "0.1.0" => string VERSION;
@@ -23,8 +23,8 @@ Package pkg("AmbPanACN");
     "Gregg Oliva"
 ] => pkg.authors;
 
-"https://github.com/gloliva/AmbPanACN/tree/master" => pkg.homepage;
-"https://github.com/gloliva/AmbPanACN/tree/master" => pkg.repository;
+"https://github.com/gloliva/AmbiPan/tree/master" => pkg.homepage;
+"https://github.com/gloliva/AmbiPan/tree/master" => pkg.repository;
 
 "An ambisonics panner that supports up to 7th order." => pkg.description;
 "MIT" => pkg.license;
@@ -36,7 +36,7 @@ Package pkg("AmbPanACN");
 "./chump" => pkg.generatePackageDefinition;
 
 // Now we need to define a specific PackageVersion and all the associated files and metadata
-PackageVersion ver("AmbPanACN", VERSION);
+PackageVersion ver("AmbiPan", VERSION);
 
 // what is the oldest version of ChucK this package will run on?
 "1.5.5.0" => ver.languageVersionMin;
@@ -53,18 +53,18 @@ if (os == "mac") {
 
 // add our package's files
 if (os == "windows") {
-    ver.addFile("x64/Release/AmbPanACN.chug");
+    ver.addFile("x64/Release/AmbiPan.chug");
 } else {
-    ver.addFile("AmbPanACN.chug");
+    ver.addFile("AmbiPan.chug");
 }
 
 // add example files, this will be stored in the package's `_examples` directory.
-ver.addExampleFile("examples/AmbPanACN-example3Voices.ck");
-ver.addExampleFile("examples/AmbPanACN-exampleNVoices.ck");
+ver.addExampleFile("examples/AmbiPan-example3Voices.ck");
+ver.addExampleFile("examples/AmbiPan-exampleNVoices.ck");
 
 // zip up all our files into AwesomeEffect.zip, and tell Chumpinate what URL
 // this zip file will be located at.
-ver.generateVersion("./chump", "HashMap", "https://ccrma.stanford.edu/~gloliva/ambisonics/releases/" + VERSION + "/AmbPanACN-" + os + ".zip");
+ver.generateVersion("./chump", "HashMap", "https://ccrma.stanford.edu/~gloliva/ambisonics/releases/" + VERSION + "/AmbiPan-" + os + ".zip");
 
 // Generate a version definition json file, stores this in "AwesomeEffect/<VerNo>/version-<os>.json"
-ver.generateVersionDefinition("AmbPanACN-" + os, "./chump");
+ver.generateVersionDefinition("AmbiPan-" + os, "./chump");

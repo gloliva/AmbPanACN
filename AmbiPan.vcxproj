@@ -122,10 +122,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="AmbPanACN.cpp" />
+    <ClCompile Include="AmbiPan.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AmbPanACN.h" />
+    <ClInclude Include="AmbiPan.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Targets" />
 </Project>

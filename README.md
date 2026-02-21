@@ -1,6 +1,6 @@
-# AmbPanACN
+# AmbiPan
 
-AmbPanACN is an ambisonics chugin (i.e. ChucK plugin) that supports up to 7th order.
+AmbiPan is an ambisonics panner chugin (i.e. ChucK plugin) that supports up to 7th order.
 It uses ACN ordering and SN3D normalization.
 
 ## Installation
@@ -50,22 +50,22 @@ $ chuck --probe
 When you have the device number, you can run chuck programs like this:
 
 ```bash
-$ chuck --chugin:./AmbPanACN.chug --dac:<DEVICE_FOR_AMBISONICS> --out:<NUM_OUTS_NEEDED_FOR_ORDER> program.ck
+$ chuck --chugin:./AmbiPan.chug --dac:<DEVICE_FOR_AMBISONICS> --out:<NUM_OUTS_NEEDED_FOR_ORDER> program.ck
 ```
 
 For example, if your device number is `4` and you are working in 5th order ambisonics (which needs 36 outputs), run:
 
 ```bash
-$ chuck --chugin:./AmbPanACN.chug --dac:4 --out:36 program.ck
+$ chuck --chugin:./AmbiPan.chug --dac:4 --out:36 program.ck
 ```
 
-## How To Use AmbPanACN
+## How To Use AmbiPan
 
-`AmbPanACN` is a UGen that can be connected like any other:
+`AmbiPan` is a UGen that can be connected like any other:
 
 ```java
 // Send a sine oscillator into a 5th order ambisonics panner, and then to the DAC
-SinOsc osc(440.) => AmbPanACN pan(5) => dac;
+SinOsc osc(440.) => AmbiPan pan(5) => dac;
 ```
 
 The azimuth and elevation can be set like so:
@@ -85,30 +85,30 @@ For automating these values, one approach is to use the `Patch` and `Range` clas
 @import "Patch"
 
 // Ambisonics panner
-SinOsc osc(440.) => AmbPanACN pan(5) => dac;
+SinOsc osc(440.) => AmbiPan pan(5) => dac;
 
 // Automate azimuth with a SinOsc LFO
 SinOsc lfo(0.1) => Range r(pi / 2., -pi / 2.) => Patch p(pan, "azimuth") => blackhole;
 ```
 
-A larger example with three voices can be viewed in `examples/AmbPanACN-example3Voices.ck`.
+A larger example with three voices can be viewed in `examples/AmbiPan-example3Voices.ck`.
 
 ### Caveats
 
-Due to how ChucK currently handles creating multichannel UGens, and in order to have only 1 ambisonics encoder class (as opposed to `AmbPanACN1`, `AmbPanACN2`, ..., `AmpPanACN7`), `AmbPanACN` is a 64 channel UGen regardless of order (however, it only does the calculations for the order that is set).
+Due to how ChucK currently handles creating multichannel UGens, and in order to have only 1 ambisonics panner class (as opposed to `AmbiPan1`, `AmbiPan2`, ..., `AmbiPan7`), `AmbiPan` is a 64 channel UGen regardless of order (however, it only does the calculations for the order that is set). This can limit the number of concurrent voices; if you need a large number of concurrent voices, it is recommended to use the `AmbiEnc` encoders instead, which are a fixed order.
 
-When connecting an `AmbPanACN` object to the DAC, if the DAC is the exact number of channels as is needed by the ambisonics order, or if the remaining channels are uneeded/unused (e.g. output device supports 64 channels, but you are only using the first 36 for 5th order ambisonics), then you can connect the panner to the DAC with the `=>` operator:
+When connecting an `AmbiPan` object to the DAC, if the DAC is the exact number of channels as is needed by the ambisonics order, or if the remaining channels are uneeded/unused (e.g. output device supports 64 channels, but you are only using the first 36 for 5th order ambisonics), then you can connect the panner to the DAC with the `=>` operator:
 
 ```java
-AmbPanACN pan(5) => dac;
+AmbiPan pan(5) => dac;
 ```
 
 However, if you are using less than 64 channels (i.e. less than 7th order) for a panner and you intend to use the remaining channels for something else, you will want to connect each channel of the panner to the DAC manually. An example of this would be your DAC is 45 channels, and you are using the first 36 channels for a 5th order decoder, and the remaining 9 channels for a 2nd order decoder. You can connect channels manually like this:
 
 ```java
 // Define 5th order and 2nd order panners
-AmbPanACN pan5(5);
-AmbPanACN pan2(2);
+AmbiPan pan5(5);
+AmbiPan pan2(2);
 
 // Connect the 5th order panner (36 channels) to DAC channels 0 - 35
 for (int c; c < pan5.outChannels(); c++) {

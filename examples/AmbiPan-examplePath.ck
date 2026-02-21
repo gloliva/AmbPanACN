@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------
-// name: AmbPanACN-examplePath.ck
+// name: AmbiPan-examplePath.ck
 // desc: demo for the path function
 //
 // amb.path(float azi_init, float ele_init, float azi_final, float ele_final, dur path_time)
@@ -29,7 +29,7 @@
 0 => float elevation_low;
 0.5 => float elevation_high;
 
-Noise noise => Gain g(0.2) => AmbPanACN amb(order, normalized) => dac;
+Noise noise => Gain g(0.2) => AmbiPan amb(order, normalized) => dac;
 
 fun void monitor(dur durian) {
     while (true) {

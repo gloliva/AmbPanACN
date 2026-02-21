@@ -1,5 +1,5 @@
 /*
-    AmbPanACN-testMany.ck
+    AmbiPan-testMany.ck
 
     Test azimuth and elevation automation of three voices. Once running, you can enable/disable each individual voice by pressing
     1, 2, or 3. Press ESC to quit.
@@ -10,9 +10,9 @@
         $ chump install Range
         ```
 
-    How to run (from AmbPanACN directory):
+    How to run (from AmbiPan directory):
         ```
-        $ chuck --chugin:./AmbPanACN.chug --dac:<DEVICE_FOR_AMBISONICS> --out:<NUM_OUTS_NEEDED_FOR_ORDER> tests/AmbPanACN-testAzimuth.ck
+        $ chuck --chugin:./AmbiPan.chug --dac:<DEVICE_FOR_AMBISONICS> --out:<NUM_OUTS_NEEDED_FOR_ORDER> tests/AmbiPan-testAzimuth.ck
         ```
 */
 
@@ -44,10 +44,10 @@ if (order < 1 || order > 7) {
 }
 
 
-// instantiate AmbPanACNs
-PulseOsc osc(Math.mtof(60)) => AmbPanACN amb(order) => dac;
-SawOsc osc2(Math.mtof(63)) => AmbPanACN amb2(order, 64, AmbPanACN.RADIANS) => dac;
-SawOsc osc3(Math.mtof(70)) => AmbPanACN amb3(order, 64, AmbPanACN.RADIANS) => dac;
+// instantiate each AmbiPan
+PulseOsc osc(Math.mtof(60)) => AmbiPan amb(order) => dac;
+SawOsc osc2(Math.mtof(63)) => AmbiPan amb2(order, 64, AmbiPan.RADIANS) => dac;
+SawOsc osc3(Math.mtof(70)) => AmbiPan amb3(order, 64, AmbiPan.RADIANS) => dac;
 
 // Set gains
 0.25 => osc.gain;

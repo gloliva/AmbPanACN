@@ -1,10 +1,10 @@
 
 # chugin name
-CHUGIN_NAME=AmbPanACN
+CHUGIN_NAME=AmbiPan
 
 # all of the c/cpp files that compose this chugin
 C_MODULES=
-CXX_MODULES=AmbPanACN.cpp
+CXX_MODULES=AmbiPan.cpp
 
 # where to find chugin.h
 CK_SRC_PATH?=chuck/include
@@ -18,7 +18,7 @@ CHUGIN_PATH?=/usr/local/lib/chuck
 # ---------------------------------------------------------------------------- #
 
 # default target: print usage message and quit
-current: 
+current:
 	@echo "[chugin build]: please use one of the following configurations:"
 	@echo "   make linux, make mac, make web, or make win32"
 
@@ -116,5 +116,5 @@ install: $(CHUG)
 	cp $^ $(CHUGIN_PATH)
 	chmod 755 $(CHUGIN_PATH)/$(CHUG)
 
-clean: 
+clean:
 	rm -rf $(C_OBJECTS) $(CXX_OBJECTS) $(CHUG) $(WEBCHUG) Release Debug

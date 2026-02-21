@@ -1,11 +1,11 @@
 /*
-    AmbPanACN-testParams.ck
+    AmbiPan-testParams.ck
 
     Test basic parameter setting and retrieving.
 
-    How to run (from AmbPanACN directory):
+    How to run (from AmbiPan directory):
         ```
-        $ chuck --chugin:./AmbPanACN.chug tests/AmbPanACN-testParams.ck
+        $ chuck --chugin:./AmbiPan.chug tests/AmbiPan-testParams.ck
         ```
 */
 
@@ -65,8 +65,8 @@ if (updatePeriod < 1) {
 }
 chout <= IO.nl();
 
-// instantiate a AmbPanACN
-AmbPanACN amb(order, updatePeriod, AmbPanACN.RADIANS);
+// instantiate a AmbiPan
+AmbiPan amb(order, updatePeriod, AmbiPan.RADIANS);
 
 chout <= "Printing out amb.help() function" <= IO.nl();
 amb.help();
@@ -100,10 +100,10 @@ assert(amb.updatePeriod(), updatePeriod);
 
 // Test static variables
 assert(amb.NORMALIZED, 0);
-<<< "    Normalized static variable:", AmbPanACN.NORMALIZED >>>;
+<<< "    Normalized static variable:", AmbiPan.NORMALIZED >>>;
 
 assert(amb.RADIANS, 1);
-<<< "    Radians static variable:", AmbPanACN.RADIANS >>>;
+<<< "    Radians static variable:", AmbiPan.RADIANS >>>;
 
 // Test return values for pan
 amb.pan(pi, pi / 2.) => vec2 ret;

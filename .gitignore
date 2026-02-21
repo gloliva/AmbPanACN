@@ -3,6 +3,7 @@
 *.o
 
 .DS_Store
+.vscode/
 
 # Scratch folder
 scratch/
