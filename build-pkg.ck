@@ -19,24 +19,24 @@ Package pkg("AmbiPan");
 // add our metadata here
 "0.1.0" => string VERSION;
 [
-    "Zac Dulkin",
     "Gregg Oliva"
+    "Zac Dulkin",
 ] => pkg.authors;
 
-"https://github.com/gloliva/AmbiPan/tree/master" => pkg.homepage;
-"https://github.com/gloliva/AmbiPan/tree/master" => pkg.repository;
+"https://github.com/gloliva/Chambisonics/tree/master" => pkg.homepage;
+"https://github.com/gloliva/Chambisonics/tree/master" => pkg.repository;
 
-"An ambisonics panner that supports up to 7th order." => pkg.description;
+"Ambisonics tools for ChucK" => pkg.description;
 "MIT" => pkg.license;
 
-["ambisonics", "spatial audio", "encoder"] => pkg.keywords;
+["ambisonics", "spatial audio", "encoders", "decoders"] => pkg.keywords;
 
 // generate a package-definition json file,
 // this will be stored in (./AwesomeEffect/package.json)
 "./chump" => pkg.generatePackageDefinition;
 
 // Now we need to define a specific PackageVersion and all the associated files and metadata
-PackageVersion ver("AmbiPan", VERSION);
+PackageVersion ver("Chambisonics", VERSION);
 
 // what is the oldest version of ChucK this package will run on?
 "1.5.5.0" => ver.languageVersionMin;
@@ -55,16 +55,17 @@ if (os == "mac") {
 if (os == "windows") {
     ver.addFile("x64/Release/AmbiPan.chug");
 } else {
-    ver.addFile("AmbiPan.chug");
+    ver.addFile("AmbiPan/AmbiPan.chug");
+    ver.addFile("AmbiEnc/AmbiEnc.chug");
+    ver.addFile("AmbiBin/AmbiBin.chug");
 }
 
 // add example files, this will be stored in the package's `_examples` directory.
-ver.addExampleFile("examples/AmbiPan-example3Voices.ck");
-ver.addExampleFile("examples/AmbiPan-exampleNVoices.ck");
+// TODO: add examples here
 
 // zip up all our files into AwesomeEffect.zip, and tell Chumpinate what URL
 // this zip file will be located at.
-ver.generateVersion("./chump", "HashMap", "https://ccrma.stanford.edu/~gloliva/ambisonics/releases/" + VERSION + "/AmbiPan-" + os + ".zip");
+ver.generateVersion("./chump", "HashMap", "https://ccrma.stanford.edu/~gloliva/chambisonics/releases/" + VERSION + "/Chambisonics-" + os + ".zip");
 
 // Generate a version definition json file, stores this in "AwesomeEffect/<VerNo>/version-<os>.json"
-ver.generateVersionDefinition("AmbiPan-" + os, "./chump");
+ver.generateVersionDefinition("Chambisonics-" + os, "./chump");
